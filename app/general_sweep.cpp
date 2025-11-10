@@ -191,6 +191,12 @@ int main(int argc, const char *argv[])
             implicit_sweep = ball_genus_roll;
         } else if (args.function_file == "tangle_chair_S") {
             implicit_sweep = tangle_chair_S;
+        } else if (args.function_file == "tangle_chair") {
+            implicit_sweep = tangle_chair;
+        } else if (args.function_file == "rotating_rod") {
+            implicit_sweep = rotating_rod;
+        } else if (args.function_file == "nested_balls") {
+            implicit_sweep = nested_balls;
         } else {
             throw std::runtime_error("ERROR: file format not supported");
         }

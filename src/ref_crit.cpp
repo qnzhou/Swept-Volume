@@ -11,7 +11,7 @@
 std::array<double, 2> query_2d = {0.0, 0.0}; // X, Y
 
 /// bezier ordinates of a 4D cubic simplex
-const Eigen::Matrix<double, 35, 5> ls {
+const Eigen::Matrix<double, 35, 5, Eigen::RowMajor> ls {
     /// Vertices
     {3, 0, 0, 0, 0}, {0, 3, 0, 0, 0}, {0, 0, 3, 0, 0}, {0, 0, 0, 3, 0}, {0, 0, 0, 0, 3},
     
@@ -206,10 +206,10 @@ void  adjugate(const Eigen::Matrix<double, 4, 4>& mat,
 
 void bezierElev(const Eigen::RowVector<double, 16>& ords,
                 Eigen::RowVector<double, 35>& bezier){
+    Eigen::Vector<double, 5> elevRow;
     for (size_t i = 0; i < 35; i++){
-        Eigen::Vector<double, 5> elevRow;
         elevRow << ords[elevMatrix[i][0]], ords[elevMatrix[i][1]], ords[elevMatrix[i][2]], ords[elevMatrix[i][3]], ords[elevMatrix[i][4]];
-        bezier[i] = (ls.row(i) * elevRow);
+        bezier[i] = ls.row(i).dot(elevRow);
     }
     bezier = bezier / 3.0;
 }

@@ -2,11 +2,10 @@ if (TARGET stf::stf)
     return()
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-    stf
-    GIT_REPOSITORY https://github.com/adobe-research/space-time-functions.git
-    GIT_TAG main
-    )
+include(CPM)
+CPMAddPackage(
+    NAME stf
+    GITHUB_REPOSITORY adobe-research/space-time-functions
+    GIT_TAG 261207038fe50515a67b1231ea27bcdcc475abdf
+)
 
-FetchContent_MakeAvailable(stf)

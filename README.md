@@ -35,7 +35,7 @@ To use the `general_sweep` tool, you must provide an initial grid file and outpu
 
 ### 4D Implicit Function Framework: 
 
-The input of this program is any generalized sweep that is represented by a smooth 4D implicit function. Currently, we provide a series of pre-defined functions which include all paper examples. You can specify an implicit function file or use one of the predefined function names. Unfortunately, we do not provide a GUI or a user-friendly tool for defining such functions at this moment. If you want to specify your own sweep, please refer to this [repository](https://github.com/qnzhou/space-time-functions) and specific use cases in `trajectory.h` for details.
+The input of this program is any generalized sweep that is represented by a smooth 4D implicit function. Currently, we provide a series of pre-defined functions which include all paper examples. You can specify an implicit function file or use one of the predefined function names. Unfortunately, we do not provide a GUI or a user-friendly tool for defining such functions at this moment. If you want to specify your own sweep, please refer to this [repository](https://github.com/adobe-research/space-time-functions) and specific use cases in `trajectory.h` for details.
 
 ### Positional Arguments
 

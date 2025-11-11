@@ -37,6 +37,7 @@ int main(int argc, const char *argv[])
         int rot = 0;
         bool without_snapping = false;
         bool without_opt_triangulation = false;
+        bool cyclic = false;
     } args;
     CLI::App app{"Generalized Swept Volume"};
     app.add_option("grid", args.grid_file, "Initial grid file")->required();
@@ -49,7 +50,7 @@ int main(int argc, const char *argv[])
     app.add_flag("--without-snapping", args.without_snapping, "Disable vertex snapping in iso-surfacing step");
     app.add_flag("--without-optimal-triangulation", args.without_opt_triangulation,
                  "Disable optimal triangulation in iso-surfacing triangulation step");
-    
+    app.add_flag("--cyclic", args.cyclic, "Whether the trajectory is cyclic or not");
     CLI11_PARSE(app, argc, argv);
     // Read initial grid
     mtet::MTetMesh grid;
@@ -197,6 +198,12 @@ int main(int argc, const char *argv[])
             implicit_sweep = rotating_rod;
         } else if (args.function_file == "nested_balls") {
             implicit_sweep = nested_balls;
+        } else if (args.function_file == "close_loop") {
+            implicit_sweep = close_loop;
+        } else if (args.function_file == "close_loop_2") {
+            implicit_sweep = close_loop_2;
+        } else if (args.function_file == "tet_roll") {
+            implicit_sweep = tet_roll;
         } else {
             throw std::runtime_error("ERROR: file format not supported");
         }
@@ -225,7 +232,7 @@ int main(int argc, const char *argv[])
     mtet::save_mesh("tet_grid.msh", grid);
     
     Scalar iso_value = 0.0;
-    bool cyclic = false;
+    bool cyclic = args.cyclic;
     std::vector<mtetcol::Scalar> verts;
     std::vector<mtetcol::Index> simps;
     std::vector<std::vector<double>> time;
@@ -270,6 +277,7 @@ int main(int argc, const char *argv[])
     // Extract isocontour
     auto isocontour = contour.isocontour(function_values, gradient_values, !args.without_snapping);
     isocontour.triangulate_cycles(!args.without_opt_triangulation);
+    isocontour.is_cycle_regular(0);
     if (!std::filesystem::exists(output_path)) {
         // Attempt to create the directory
         if (std::filesystem::create_directory(output_path)) {
@@ -293,7 +301,7 @@ int main(int argc, const char *argv[])
     
 #if SAVE_CONTOUR
     mtetcol::save_contour(output_path + "/temporal_grid.obj", contour);
-    mtetcol::save_contour(output_path + "/contour.msh", isocontour);
+    mtetcol::save_contour(output_path + "/envelope.msh", isocontour);
     
     /// Mathematica isosurfacing output:
     std::vector<std::array<double, 3>> verts_math;
@@ -362,18 +370,52 @@ int main(int argc, const char *argv[])
         << profileCount[i] << std::endl;
     }
 #endif
-    igl::write_triangle_mesh(output_path + "/mesh" + ".obj", vertices, faces);
+    igl::write_triangle_mesh(output_path + "/envelope" + ".obj", vertices, faces);
+    // Collect per-component cleaned meshes
+    std::vector<Eigen::MatrixXd> V_parts;
+    std::vector<Eigen::MatrixXi> F_parts;
     for (size_t i = 0; i < out_faces.size(); i++){
         Eigen::MatrixXd V_clean;
         Eigen::MatrixXi F_clean;
         Eigen::VectorXi I;
         Eigen::VectorXi J;
         igl::remove_unreferenced(out_vertices, out_faces[i], V_clean, F_clean, I, J);
-        igl::write_triangle_mesh(output_path + "/" + std::to_string(i) + ".obj", V_clean, F_clean);
         Eigen::VectorXd labels = propagate_labels_bfs(V_clean, F_clean, timeMap);
         backfill_timeMap_from_labels(V_clean, labels, timeMap);
+        igl::write_triangle_mesh(output_path + "/" + std::to_string(i) + ".obj", V_clean, F_clean);
         mshio::MshSpec spec = generate_spec(V_clean, F_clean, timeMap);
         mshio::save_msh(output_path + "/" + std::to_string(i) + ".msh", spec);
+        
+        V_parts.push_back(std::move(V_clean));
+        F_parts.push_back(std::move(F_clean));
+    }
+    
+    int totalV = 0, totalF = 0;
+    for (size_t i = 0; i < V_parts.size(); ++i) {
+        totalV += static_cast<int>(V_parts[i].rows());
+        totalF += static_cast<int>(F_parts[i].rows());
+    }
+
+    Eigen::MatrixXd V_all(totalV, 3);
+    Eigen::MatrixXi F_all(totalF, 3);
+
+    int v_off = 0, f_off = 0;
+    for (size_t i = 0; i < V_parts.size(); ++i) {
+        const auto& Vi = V_parts[i];
+        const auto& Fi = F_parts[i];
+
+        V_all.block(v_off, 0, Vi.rows(), 3) = Vi;
+
+        F_all.block(f_off, 0, Fi.rows(), 3) = (Fi.array() + v_off).matrix();
+
+        v_off += static_cast<int>(Vi.rows());
+        f_off += static_cast<int>(Fi.rows());
+    }
+
+    igl::write_triangle_mesh(output_path + "/mesh.obj", V_all, F_all);
+    {
+        mshio::MshSpec spec_all = generate_spec(V_all, F_all, timeMap);
+        mshio::save_msh(output_path + "/mesh.msh", spec_all);
     }
 #if batch_stats
     std::string stats_file = "stats.json";

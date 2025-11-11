@@ -2,10 +2,9 @@ if(TARGET arrangement::arrangement)
     return()
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-    arrangement
-    GIT_REPOSITORY git@github.com:qnzhou/arrangement-benchmark.git
-    GIT_TAG main
+include(CPM)
+CPMAddPackage(
+    NAME arrangement
+    GITHUB_REPOSITORY adobe-research/arrangement-benchmark
+    GIT_TAG 5933c167f2277a10c1342e3e4c6de72bdfb94b4a
 )
-FetchContent_MakeAvailable(arrangement)

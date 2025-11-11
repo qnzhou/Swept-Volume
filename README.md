@@ -40,9 +40,10 @@ The input of this program is any generalized sweep that is represented by a smoo
 ### Positional Arguments
 
 - `grid` : The path to the initial grid file that will be used for grid generation. This file can be either a `.msh` or `.json` file. When a `.json` file is provided, it will be converted to a `.msh` file internally. The format to specify an initial grid can be found [here](https://github.com/Jurwen/Swept-Volume/blob/main/data/test/grid_1.json);
-- `output` : The output directory path where all generated files will be saved. The tool will create this directory if it doesn't exist. Output files include:
-  - `contour.msh` : The mesh before arrangement (if `SAVE_CONTOUR` is enabled)
-  - `0.obj`, `1.obj`, ... : Separated cell components with 0 winding number.
+- `output` : The output directory path where all generated files will be saved. The tool will create this directory if it doesn't exist. `.obj` files only contain the mesh, while `.msh` files have additional time info. Output files include:
+  - `envelope.msh`, `envelope.obj` : The mesh before arrangement (if `SAVE_CONTOUR` is enabled)
+  - (`0.obj`, `1.obj`, ...), (`0.msh`, `1.msh`, ...) : Separated cell components with 0 winding number.
+  - `mesh.obj`, `mesh.msh` : Combined cell componnets with 0 winding number.
   - `features.json` : Feature lines (first slot) and points (second slot) 
 
 ### Options
@@ -96,7 +97,11 @@ This example command demonstrates how to generate a swept volume using the `brus
 ### Expected Output:
 When this command runs successfully, you'll find in the `../output/brush_stroke_example/` directory:
 - **`0.obj`, `1.obj`, ...** : Individual mesh components representing different parts of the swept envelope with 0 winding number
+- **`0.msh`, `1.msh`, ...** : Containing per-vertex info of `time`
+- **`mesh.obj`** : Combined mesh components of the swept envelope with 0 winding number
+- **`mesh.msh`** : Containing per-vertex info of `time`
+- **`envelope.obj`** : The intermediate envelope mesh before pruning
+- **`envelope.msh`** : Containing per-vertex info of `time` and `is_regular`
 - **`features.json`** : Feature lines and points that capture the topological structure of the swept volume
-- **`contour.msh`** : The intermediate envelope mesh before pruning, containing per-vertex info of `time` and `is_regular` (if enabled)
 
-This example showcases how different threshold values balance between computational efficiency and geometric fidelity, making it suitable for both quick prototyping and high-quality final results.
+This example showcases how different parameters should work in an actual use case.

@@ -13,6 +13,7 @@
 #include "adaptive_column_grid.h"
 #include "timer.h"
 
+/// Large matrix to convert vals grads of 5 vertcies into 35 bezier control points. [Not used at the moment]
 static const Eigen::Matrix<double,35,30> BEZIER_M2 {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -107,21 +108,14 @@ bool refineFtBezier(
                     bool& zeroX);
 
 /// 3D (projected) distance check for the sweep function for 3D tetrahedra lives in the 4D domain, i.e., tets with 4D vertices. These tets are the results after the first stage subdivision.
-/// @param[in] pts         An array of the coordinates of 4 4D vertices.
-/// @param[in] vals            A list of 4 function values of these 4D vertices.
-/// @param[in] grads          An array of 4 directional derivatives of the sweep functions for these 4D vertices.
+/// @param[in] verts        The 4 tetrahedron vertices. Each `vertex4d` stores
+///                         4D coordinates `coord` (x,y,z,t), a scalar value `valGradList.first` (= v),
+///                         and its 4D gradient `valGradList.second` (= g). Only spatial parts of coords
+///                         are used to form the tetra geometry.
 /// @param[in] threshold            Threshold for the maxmimum allowed projected distance error for this tetrahedra.
-/// @param[out] zeroX           A tag that shows if this 5-cell contains the intersection of time derivative function and the sweep function.
+///
 /// @return         A boolean that decides if this tetrahedra needs to be subdivided.
-bool refine3D(std::array<Eigen::RowVector4d, 4> pts,
-              Eigen::RowVector<double, 4> vals,
-              std::array<Eigen::RowVector4d, 4> grads,
-              const double threshold);
-
 bool refine3D(
-//              std::array<Eigen::RowVector4d, 4> pts,
-//              Eigen::RowVector<double, 4> vals,
-//              std::array<Eigen::RowVector4d, 4> grads,
               const std::array<vertex4d, 4>& verts,
               const double threshold);
 

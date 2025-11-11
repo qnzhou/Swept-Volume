@@ -1127,6 +1127,9 @@ std::pair<Scalar, Eigen::RowVector4d> star_S(Eigen::RowVector4d inputs) {
 
     static MeshSDF sdf(filename, {0.0, 0.0, 0.0}, 0.1, -0.02);
     static stf::Rotation<3> rotation({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 360);
+    //Below two lines are for figure 22
+    //static stf::ImplicitCapsule<3> sdf(0.025, {0.0, -0.06, 0.0}, {0, 0.06, 0});
+    //static stf::Rotation<3> rotation({0.0, 0.0, 0.0}, {0.0, 1.0, 1.0}, 360 * 5);
     static stf::PolyBezier<3> bezier(
         {{0.25, 0.5, 0.25}, {1.5, 0.5, 0.4}, {-0.5, 0.5, 0.6}, {0.75, 0.5, 0.75}});
     static stf::Compose<3> transform(bezier, rotation);
@@ -1143,6 +1146,9 @@ std::pair<Scalar, Eigen::RowVector4d> star_D(Eigen::RowVector4d inputs) {
 
     static MeshSDF sdf(filename, {0.0, 0.0, 0.0}, 0.1, -0.02);
     static stf::Rotation<3> rotation({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 360);
+    //Below two lines are for figure 22
+    //static stf::ImplicitCapsule<3> sdf(0.025, {0.0, -0.06, 0.0}, {0, 0.06, 0});
+    //static stf::Rotation<3> rotation({0.0, 0.0, 0.0}, {0.0, 1.0, 1.0}, 360 * 5);
     static stf::PolyBezier<3> bezier(
         {{0.25, 0.5, 0.25}, {0.75, 0.5, 0.4}, {0.75, 0.5, 0.6}, {0.25, 0.5, 0.75}});
     static stf::Compose<3> transform(bezier, rotation);
@@ -1165,6 +1171,9 @@ std::pair<Scalar, Eigen::RowVector4d> star_F(Eigen::RowVector4d inputs) {
 
     static MeshSDF sdf(filename, {0.0, 0.0, 0.0}, 0.1, -0.02);
     static stf::Rotation<3> rotation({0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 360);
+    //Below two lines are for figure 22
+    //static stf::ImplicitCapsule<3> sdf(0.025, {0.0, -0.06, 0.0}, {0, 0.06, 0});
+    //static stf::Rotation<3> rotation({0.0, 0.0, 0.0}, {0.0, 1.0, 1.0}, 360 * 5);
     static stf::PolyBezier<3> bezier(
         {{0.4, 0.5, 0.25}, {0.4, 0.5, 0.6}, {0.3, 0.5, 0.75}, {0.75, 0.5, 0.75}});
     static stf::Compose<3> transform(bezier, rotation);
@@ -1361,6 +1370,45 @@ std::pair<Scalar, Eigen::RowVector4d> bunny_blend(Eigen::RowVector4d inputs) {
     return {value, Eigen::RowVector4d(gradient[0], gradient[1], gradient[2], gradient[3])};
 }
 
+//Smaller sphere in a close loop
+std::pair<Scalar, Eigen::RowVector4d> close_loop(Eigen::RowVector4d inputs) {
+    stf::ImplicitSphere base_shape(0.2, {0.2, 0.2, 0.5});
+
+    static stf::Rotation<3> rotation_Z({0.51, 0.51, 0.51}, {0.0, 0.0, 1.0}, 360);
+    static stf::SweepFunction<3> sweep_function(base_shape, rotation_Z);
+
+    Scalar value = sweep_function.value({inputs(0), inputs(1), inputs(2)}, inputs(3));
+    auto gradient = sweep_function.gradient({inputs(0), inputs(1), inputs(2)}, inputs(3));
+    return {value, Eigen::RowVector4d(gradient[0], gradient[1], gradient[2], gradient[3])};
+}
+
+//Bigger sphere in a close loop
+std::pair<Scalar, Eigen::RowVector4d> close_loop_2(Eigen::RowVector4d inputs) {
+    stf::ImplicitSphere base_shape(0.3, {0.4, 0.4, 0.5});
+
+    static stf::Rotation<3> rotation_Z({0.51, 0.51, 0.51}, {0.0, 0.0, 1.0}, 360);
+    static stf::SweepFunction<3> sweep_function(base_shape, rotation_Z);
+
+    Scalar value = sweep_function.value({inputs(0), inputs(1), inputs(2)}, inputs(3));
+    auto gradient = sweep_function.gradient({inputs(0), inputs(1), inputs(2)}, inputs(3));
+    return {value, Eigen::RowVector4d(gradient[0], gradient[1], gradient[2], gradient[3])};
+}
+
+//Rotating a tet
+std::pair<Scalar, Eigen::RowVector4d> tet_roll(Eigen::RowVector4d inputs) {
+    std::filesystem::path data_dir(DATA_DIR);
+    std::string filename = (data_dir / "meshes" / "tet.obj").string();
+
+    static MeshSDF sdf(filename, {0.25, 0.5, 0.5}, 0.2, 0);
+    static stf::Rotation<3> rotation({0.25, 0.5, 0.5}, {1, 0, 0}, 180);
+    static stf::Translation<3> translation({-0.5, 0, 0});
+    static stf::Compose<3> flip(translation, rotation);
+    static stf::SweepFunction<3> sweep_function(sdf, flip);
+
+    Scalar value = sweep_function.value({inputs(0), inputs(1), inputs(2)}, inputs(3));
+    auto gradient = sweep_function.gradient({inputs(0), inputs(1), inputs(2)}, inputs(3));
+    return {value, Eigen::RowVector4d(gradient[0], gradient[1], gradient[2], gradient[3])};
+}
 
 std::pair<Scalar, Eigen::RowVector4d> loopDloop_with_offset_v3(Eigen::RowVector4d inputs) {
     static stf::ImplicitTorus base_shape(0.07, 0.04, {0.0, 0.0, 0.0});

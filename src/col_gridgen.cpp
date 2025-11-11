@@ -310,6 +310,7 @@ void compare_time(const double tet_time,
 
 std::vector<uint32_t> one_column_simp = {0, 1, 2, 3};
 
+///see descriptions in header
 bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &insideMap, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const double threshold, const double traj_threshold, const int max_splits, std::array<double, timer_amount>& profileTimer, std::array<size_t, timer_amount>& profileCount){
     init5CGrid(3, grid, func, MAX_TIME, vertexMap);
     double min_tet_ratio = 1.0;

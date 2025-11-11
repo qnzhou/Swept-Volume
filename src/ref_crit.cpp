@@ -28,9 +28,10 @@ const Eigen::Matrix<double, 35, 5, Eigen::RowMajor> ls {
     {0, 1, 0, 1, 1}, {0, 0, 1, 1, 1}
 };
 
-/// Hard coded parameters for taking 
+/// Hard coded parameters that take the derivative of a bezier simplex.
 const std::array<std::array<size_t, 2>, 15> derMatrix {{{0, 8}, {5, 27}, {6, 29}, {7, 30}, {8, 21}, {9, 12}, {25, 32}, {26, 33}, {27, 22}, {13, 16}, {28, 34}, {29, 23}, {17, 20}, {30, 24}, {21, 4}}};
 
+/// Hard coded parameters that elevate the simplex to cubic.
 const std::array<std::array<size_t, 5>, 35> elevMatrix {{{0, 15, 15, 15, 15}, {15, 5, 15, 15, 15}, {15, 15, 9, 15, 15}, {15,
     15, 15, 12, 15}, {15, 15, 15, 15, 14}, {1, 0, 15, 15, 15}, {2, 15,
         0, 15, 15}, {3, 15, 15, 0, 15}, {4, 15, 15, 15, 0}, {5, 1, 15, 15,
@@ -50,12 +51,26 @@ inline bool get_sign(const double x) {
     return x > 0;
 }
 
+/// Hard coded indices of top and bottom tetrahedra of the 4D Bezier simplex control coordinates(35 indices in total).
 const std::array<int, 16> topFIndices = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 20, 21, 23, 26};
 const std::array<int, 16> botFIndices = {5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19, 26, 27, 28, 29};
 
-// ────────────────────────────────────────────────────────────────────────────────
-// Same signature, just force aggressive inlining for tight loops
-// ────────────────────────────────────────────────────────────────────────────────
+/// Construct the 4D Bezier control points for a given 5-point (penta-linear) element in spacetime.
+/// This function interpolates both position and gradient information across the 5 vertices
+/// of a 4D simplex (5-cell) to generate 35 Bezier control points representing the 4D Bezier simplex.
+/// The resulting Bezier simplex can then be used for zero crossing check and distance check.
+///
+/// @param[in] p1–p5        The 4D vertex positions (x, y, z, t) of the 5-cell. Each is an Eigen::RowVector4d.
+/// @param[in] v1–v5        The scalar function values (e.g., implicit field or signed distance) associated with each vertex.
+/// @param[in] g1–g5        The gradients of the scalar field at each vertex, stored as 4D row vectors corresponding to ∂f/∂x, ∂f/∂y, ∂f/∂z, ∂f/∂t.
+/// @param[out] bezier      An array of 35 Bezier control points representing the 4D Bezier simplex of the 5-cell.
+///                         These control points encode both positional and derivative information to ensure
+///                         smooth interpolation across the simplex.
+/// @param[out] inside      A conservative tag indicating whether all Bezier control points are negative,
+///                         implying that the entire 5-cell is inside the swept volume (no sign change within the simplex).
+///
+/// @return                 A boolean value that indicates whether the Bezier simplex has a zero crossing using sweep function
+
 [[gnu::always_inline]]
 inline bool bezier4D(
                      const Eigen::RowVector4d& p1,
@@ -172,10 +187,18 @@ inline bool bezier4D(
     return get_sign(mx) != get_sign(mn);
 }
 
-
+/// Compute the adjugate (classical adjoint) of a 4×4 matrix using explicit minor and cofactor expansion.
+/// The adjugate matrix is the transpose of the cofactor matrix and is used in computing the matrix inverse
+/// or determinant-related geometric transformations in 4D computations. This implementation iteratively
+/// evaluates all 3×3 minors of the input matrix and constructs the transposed cofactor matrix explicitly.
+///
+/// @param[in] mat          The input 4×4 matrix. Typically represents a Jacobian or transformation matrix
+///                         in 4D space (e.g., spatial-temporal derivatives or local frame transformations).
+/// @param[out] adjugate    The resulting 4×4 adjugate (classical adjoint) matrix. Each element (j, i)
+///                         corresponds to the signed determinant of the 3×3 minor obtained by removing
+///                         the i-th row and j-th column from the input matrix.
 void  adjugate(const Eigen::Matrix<double, 4, 4>& mat,
                Eigen::Matrix4d& adjugate) {
-    //Eigen::Matrix4d adjugate;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             Eigen::Matrix3d minor;
@@ -200,10 +223,19 @@ void  adjugate(const Eigen::Matrix<double, 4, 4>& mat,
             adjugate(j, i) = cofactor; // Note the transpose here
         }
     }
-    
-    //return adjugate;
 }
 
+/// Perform degree elevation from a quadratic Bezier simplex to a cubic Bezier simplex in 4D space.
+/// This function computes the elevated Bezier control ordinates by linearly combining the 16 original
+/// cubic coefficients using a precomputed elevation matrix (`elevMatrix`) and weighting matrix (`ls`).
+/// The resulting 35 cubic control ordinates preserve the original geometric form while improving
+/// smoothness and compatibility with higher-order Bezier simplex evaluations.
+///
+/// @param[in] ords         The 16 Bezier control ordinates (coefficients) corresponding to the cubic Bezier tetrahedron.
+///                         Each ordinate represents the scalar value of the Bezier function at a vertex in barycentric order.
+/// @param[out] bezier      The 35 elevated Bezier control ordinates for the cubic Bezier simplex.
+///                         These ordinates are computed by applying the linear transformation defined by `elevMatrix`
+///                         and `ls`, followed by normalization.
 void bezierElev(const Eigen::RowVector<double, 16>& ords,
                 Eigen::RowVector<double, 35>& bezier){
     Eigen::Vector<double, 5> elevRow;
@@ -214,7 +246,19 @@ void bezierElev(const Eigen::RowVector<double, 16>& ords,
     bezier = bezier / 3.0;
 }
 
-
+/// Compute the elevated Bezier control ordinates for the directional derivative of a cubic (order-3)
+/// 4D Bezier simplex along its temporal edge. The derivative yields a quadratic (order-2) Bezier simplex,
+/// which is subsequently degree-elevated to cubic to produce 35 ordinates for uniform processing.
+///
+/// @param[in] ords         35 cubic Bezier ordinates of the scalar field on the 4D 5-cell (barycentric order).
+/// @param[in] verts        The 5 vertices of the simplex (RowVector4d), used to normalize by ‖verts[0]−verts[4]‖.
+/// @param[out] bezierGrad  35 cubic Bezier ordinates of the directional derivative after degree elevation.
+///
+/// @details                Differences indexed by `derMatrix` form 16 cubic derivative ordinates (scaled by 3/‖Δt‖),
+///                         then `bezierElev` elevates quadratic→cubic. Sign consistency of `bezierGrad` is returned.
+///
+/// @return                 true if max and min coefficients of `bezierGrad` share the same sign (no zero crossing);
+///                         false otherwise.
 bool bezierDerOrds(const Eigen::RowVector<double, 35>& ords,
                     const std::array<Eigen::RowVector4d, 5>& verts,
                     Eigen::RowVector<double, 35>& bezierGrad)
@@ -230,12 +274,26 @@ bool bezierDerOrds(const Eigen::RowVector<double, 35>& ords,
     return get_sign(bezierGrad.maxCoeff()) == get_sign(bezierGrad.minCoeff());
 }
 
-std::array<double, 70> parse_convex_points2d(const Eigen::Matrix<double, 2, 35> valList) {
-    std::array<double, 70> transposed;
-    Eigen::MatrixXd::Map(transposed.data(), 2, 35) = valList;
-    return transposed;
-}
-
+/// Extremely fast outside-hull clipping test for a 2D set of Bezier ordinates projected to the plane.
+/// Given 35 2D points (e.g., a cubic Bezier simplex control points in 4D),
+/// this routine checks whether all points lie within some origin-centered half-plane
+/// (i.e., there exists a direction u such that u·p >= 0 for all points p).
+/// Equivalently, it verifies that the convex hull of the points does **not** wrap around
+/// the origin (no full 360° coverage), so a line through the origin separates the origin
+/// from the point set.
+///
+/// The algorithm maintains a feasible angular wedge of outward normals, initialized by the
+/// first point’s perpendiculars, and iteratively clips this wedge with each subsequent point.
+/// If the wedge becomes empty, the origin is enclosed by the hull and the test fails.
+///
+/// @param[in] pts          A 2×35 matrix whose columns are the 2D points to test.
+///                         Columns are 35 bezier control points.
+/// @return                 true  if a separating origin-centered half-plane exists (origin is outside the hull);
+///                         false if the feasible wedge collapses (origin is enclosed/covered by the hull).
+///
+/// @note                   Robustness control: uses a small epsilon (1e-7) to handle near-collinear cases and ties by
+///                         falling back to an orientation test via a perpendicular vector.
+///                         The helper `perp(v) = (-v_y, v_x)` rotates vectors by +90°.
 bool outHullClip2D(Eigen::Matrix<double, 2, 35> pts){
     const double eps = 0.0000001;
     bool r1, r2;
@@ -388,16 +446,13 @@ bool refineFt(
 
 /// Construct the values of one function at the bezier control points within a tet.
 ///
-/// @param[in] pts          The vertex cooridantes of four tet vertices.
-/// @param[in] vals         The function values at four tet vertices.
-/// @param[in] grads            The total derivative of the functions in x, y, z, t direction at four tet vertices.
+/// @param[in] p1-p4          The vertex cooridantes of four tet vertices.
+/// @param[in] v1-v4         The function values at four tet vertices.
+/// @param[in] g1-g4            The total derivative of the functions in x, y, z, t direction at four tet vertices.
 /// @param[out] bezier          The eigen vector of 20 bezier values.
 ///
 /// @return         If 20 bezier values contain zero-crossing.
 bool bezier3D(
-//              const std::array<Eigen::RowVector4d, 4>& pts,
-//              const Eigen::RowVector4d& vals,
-//              const std::array<Eigen::RowVector4d, 4>& grads,
               const Eigen::RowVector4d& p1,
               const Eigen::RowVector4d& p2,
               const Eigen::RowVector4d& p3,
@@ -410,7 +465,6 @@ bool bezier3D(
               const Eigen::RowVector4d& g2,
               const Eigen::RowVector4d& g3,
               const Eigen::RowVector4d& g4,
-//              const std::array<vertex4d*, 5>& verts,
               Eigen::RowVector<double, 20>& bezier)
 {
     // Compute edge values
@@ -471,9 +525,6 @@ Eigen::Vector<double, 16> bezierDiff(const Eigen::Vector<double,20> valList)
 
 /// See header
 bool refine3D(
-//              std::array<Eigen::RowVector4d, 4> pts,
-//              Eigen::RowVector<double, 4> vals,
-//              std::array<Eigen::RowVector4d, 4> grads,
               const std::array<vertex4d, 4>& verts,
               const double threshold){
     const auto& p1 = verts[0].coord;

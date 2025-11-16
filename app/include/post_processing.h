@@ -155,7 +155,8 @@ void compute_sweep_volume(const arrangement::MatrixFr& vertices, const arrangeme
     int num_cells = engine->get_num_cells();
     int num_patches = engine->get_num_patches();
     int num_facets = arrangement_faces.rows();
-    std::vector<int> wind_list(num_cells);
+    assert(patches.size() == num_facets);
+    std::vector<int> wind_list(num_cells, std::numeric_limits<int>::max());
     std::vector<double> volInfo(num_cells, 0);
     std::vector<int> faceCountInfo(num_cells, 0);
     std::vector<size_t> cellIt;
@@ -168,13 +169,21 @@ void compute_sweep_volume(const arrangement::MatrixFr& vertices, const arrangeme
         Eigen::Vector3d vj = out_vertices.row(j);
         Eigen::Vector3d vk = out_vertices.row(k);
         Eigen::Vector3d vl = out_vertices.row(l);
-        Scalar vol = vj.dot( vk.cross(vl) );
-        volInfo[c0] += vol / 6;
+        double vol = vj.dot( vk.cross(vl) );
+        volInfo[c0] -= vol / 6;
         volInfo[c1] += vol / 6;
         faceCountInfo[c0] += 1;
         faceCountInfo[c1] += 1;
-        wind_list[c0] = winding_number(facet_idx, 0);
-        wind_list[c1] = winding_number(facet_idx, 1);
+        if (wind_list[c0] == std::numeric_limits<int>::max()) {
+            wind_list[c0] = winding_number(facet_idx, 0);
+        } else {
+            assert(wind_list[c0] == winding_number(facet_idx, 0));
+        }
+        if (wind_list[c1] == std::numeric_limits<int>::max()) {
+            wind_list[c1] = winding_number(facet_idx, 1);
+        } else {
+            assert(wind_list[c1] == winding_number(facet_idx, 1));
+        }
     }
 
     std::vector<bool> valid(num_cells, false);

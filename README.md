@@ -61,7 +61,7 @@ The input of this program is any generalized sweep that is represented by a smoo
 The following is an example of how to use the `general_sweep` tool with common options:
 
 ```bash
-./general_sweep ../data/test/grid_1.json ../output/brush_stroke_example -t 0.0005 --tt 0.005 -f brush_stroke_blending
+./general_sweep ../data/test/grid_1.json ../output/brush_stroke_example --ee 0.0005 --es 0.005 -f brush_stroke_blending
 ```
 
 ### Parameter Breakdown:
@@ -74,17 +74,16 @@ This example command demonstrates how to generate a swept volume using the `brus
 - **`../output/brush_stroke_example`** : The output directory where all generated files will be saved. The tool will create this directory if it doesn't exist.
 
 #### Optional Parameters:
-- **`-t 0.0005`** : Sets the **grid refinement threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's gradient magnitude. A smaller value (like 0.0005) means:
-  - Higher precision in capturing surface details
+- **`--ee 0.0005`** : Sets the **environment threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's gradient magnitude. A small value (like 0.0005) means:
+  - High precision in capturing surface details
   - More computational time and memory usage
   - Better preservation of sharp features and fine geometric details
   - The algorithm will subdivide grid cells more aggressively where the function changes rapidly
 
-- **`--tt 0.005`** : Sets the **trajectory threshold** to 0.005. This parameter controls the precision of trajectory processing, which is crucial for:
+- **`--es 0.005`** : Sets the **silhouette threshold** to 0.005. This parameter controls the precision of trajectory processing, which is crucial for:
   - Temporal discretization of the 4D sweep
-  - Determining how finely to sample the time dimension of the sweep
+  - Determining how finely to sample the 4D grid based on the complexity of the trajectory
   - Capturing temporal variations in the implicit function
-  - A smaller value provides better temporal resolution but increases computation time
 
 - **`-f brush_stroke_blending`** : Specifies the **implicit function** to use. The `brush_stroke_blending` function represents a particular sweep pattern that:
   - Creates a brush stroke-like swept volume with blending effects

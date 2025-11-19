@@ -39,7 +39,7 @@ The input of this program is any generalized sweep that is represented by a smoo
 
 ### Positional Arguments
 
-- `grid` : The path to the initial grid file that will be used for grid generation. This file can be either a `.msh` or `.json` file. When a `.json` file is provided, it will be converted to a `.msh` file internally. The format to specify an initial grid can be found [here](https://github.com/Jurwen/Swept-Volume/blob/main/data/test/grid_1.json);
+- `grid` : The path to the initial grid file that will be used for grid generation. This file can be either a `.msh` or `.json` file. When a `.json` file is provided, it will be converted to a `.msh` file internally. The format to specify an initial grid can be found [here](https://github.com/Jurwen/Swept-Volume/blob/main/data/test/grid_1.json). For this file format, you only need to specify the bounding box of the initial grid and how "dense" this initial grid is, which is controlled by the `resolution` parameter. The higher the resolution, the denser the initial mesh.
 - `output` : The output directory path where all generated files will be saved. The tool will create this directory if it doesn't exist. `.obj` files only contain the mesh, while `.msh` files have additional time info. Output files include:
   - `envelope.msh`, `envelope.obj` : The mesh before arrangement (if `SAVE_CONTOUR` is enabled)
   - (`0.obj`, `1.obj`, ...), (`0.msh`, `1.msh`, ...) : Separated cell components with 0 winding number.
@@ -52,18 +52,16 @@ The input of this program is any generalized sweep that is represented by a smoo
 - `-f, --function <file>` : Specify an implicit function file or predefined function name. Can be:
   - A predefined function name (e.g., `fertility_v4`, `kitten_dog`, `letter_L_blend`, `ball_genus_roll`, `tangle_chair_S`, `star_S`, etc.)
   - See `trajectory.h` for all available predefined functions
-- `-t, --threshold <value>` : Set the threshold value for grid generation (default: 0.0005). Lower values produce coarser grids. This is a DOUBLE value that controls the precision level.
-- `--tt, --traj-threshold <value>` : Set the threshold value for trajectory processing (default: 0.005). This is a DOUBLE value that controls trajectory precision.
-- `-m, --max-splits <number>` : Set the maximum number of splits for grid generation to avoid infinite subdivision (default: unlimited). This is a sanity parameter to prevent degeneracies.
-- `--without-snapping` : Disable vertex snapping in the iso-surfacing step.
-- `--without-optimal-triangulation` : Disable optimal triangulation in the iso-surfacing triangulation step. 
+- `--ee, --epsilon-env <value>` : Set the environment threshold (default: 0.0005). Lower values produce finer grids for the sweep function. This is a DOUBLE value that controls the mesh precision. This parameter corresponds to the `epsilon_env` variable stated in the paper
+- `--es, --epsilon-sil <value>` : Set the silhouette threshold (default: 0.005). Lower values produce finer grids for the silhouette function.This is a DOUBLE value that controls trajectory precision. This parameter corresponds to the `epsilon_sil` variable stated in the paper
+- `-i, --inside-check`: Whether the grid generation will do a full grid refinement considering regions of the envelope that is inside the sweep. Turning this on will generate a complete smooth envelope with fine details for inside regions. Note that this tag may add considerable amount of time and memory. 
 
 ## Example:
 
 The following is an example of how to use the `general_sweep` tool with common options:
 
 ```bash
-./general_sweep ../data/test/grid_1.json ../output/brush_stroke_example -t 0.0005 --tt 0.005 -f brush_stroke_blending
+./general_sweep ../data/test/grid_1.json ../output/brush_stroke_example --ee 0.0005 --es 0.005 -f brush_stroke_blending
 ```
 
 ### Parameter Breakdown:
@@ -76,17 +74,16 @@ This example command demonstrates how to generate a swept volume using the `brus
 - **`../output/brush_stroke_example`** : The output directory where all generated files will be saved. The tool will create this directory if it doesn't exist.
 
 #### Optional Parameters:
-- **`-t 0.0005`** : Sets the **grid refinement threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's gradient magnitude. A smaller value (like 0.0005) means:
-  - Higher precision in capturing surface details
+- **`--ee 0.0005`** : Sets the **environment threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's gradient magnitude. A small value (like 0.0005) means:
+  - High precision in capturing surface details
   - More computational time and memory usage
   - Better preservation of sharp features and fine geometric details
   - The algorithm will subdivide grid cells more aggressively where the function changes rapidly
 
-- **`--tt 0.005`** : Sets the **trajectory threshold** to 0.005. This parameter controls the precision of trajectory processing, which is crucial for:
+- **`--es 0.005`** : Sets the **silhouette threshold** to 0.005. This parameter controls the precision of trajectory processing, which is crucial for:
   - Temporal discretization of the 4D sweep
-  - Determining how finely to sample the time dimension of the sweep
+  - Determining how finely to sample the 4D grid based on the complexity of the trajectory
   - Capturing temporal variations in the implicit function
-  - A smaller value provides better temporal resolution but increases computation time
 
 - **`-f brush_stroke_blending`** : Specifies the **implicit function** to use. The `brush_stroke_blending` function represents a particular sweep pattern that:
   - Creates a brush stroke-like swept volume with blending effects

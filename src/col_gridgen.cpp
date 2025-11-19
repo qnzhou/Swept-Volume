@@ -12,7 +12,6 @@
 namespace dr = drjit; // For nanothread
 #define MIN_EDGE_LEN 1e-5
 #define parallel_bezier 0
-#define insideness_check 1
 
 /// Sample the list of 5-cells based on the base tetrahedra and 4 lists of time samples at its vertices. The extrusion/sampling is based on lowest time stamp, the second lowest time stamp, and the vertex id comparing the four incremental time stamps at each vertex.
 /// @param[in] grid: the base tetrahedra grid in `mtet` structure
@@ -311,7 +310,8 @@ void compare_time(const double tet_time,
 std::vector<uint32_t> one_column_simp = {0, 1, 2, 3};
 
 ///see descriptions in header
-bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &insideMap, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const double threshold, const double traj_threshold, const int max_splits, std::array<double, timer_amount>& profileTimer, std::array<size_t, timer_amount>& profileCount){
+bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &insideMap, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const double threshold, const double traj_threshold, const int max_splits,
+                const int insideness_check, std::array<double, timer_amount>& profileTimer, std::array<size_t, timer_amount>& profileCount){
     init5CGrid(3, grid, func, MAX_TIME, vertexMap);
     double min_tet_ratio = 1.0;
     ///
@@ -413,15 +413,15 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
             bool ret = refineFt(verts, traj_threshold, inside, choice, zeroX, profileTimer, profileCount);
             zeroX_list[cell5It] = zeroX;
             if (zeroX) no_intersect = false;
-#if insideness_check
-            if (inside) {
-                insideMap[vs] = true;
+            if (insideness_check){
+                if (inside) {
+                    insideMap[vs] = true;
 #if time_profile
-                first_part_timer.Stop();
+                    first_part_timer.Stop();
 #endif
-                return;
+                    return;
+                }
             }
-#endif
             if (ret) {
                 subList[cell5It] = true;
                 timeLenList[cell5It] = verts[0]->time - verts[4]->time;

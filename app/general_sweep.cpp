@@ -35,6 +35,7 @@ int main(int argc, const char *argv[])
         double traj_threshold = 0.005;
         int max_splits = std::numeric_limits<int>::max();
         int rot = 0;
+        bool insideness_check = false;
         bool without_snapping = false;
         bool without_opt_triangulation = false;
         bool cyclic = false;
@@ -43,8 +44,9 @@ int main(int argc, const char *argv[])
     app.add_option("grid", args.grid_file, "Initial grid file")->required();
     app.add_option("output", args.output_path, "Output path")->required();
     app.add_option("-f,--function", args.function_file, "Implicit function file");
-    app.add_option("-t,--threshold", args.threshold, "Threshold value");
-    app.add_option("--tt, --traj_threshold", args.traj_threshold, "Threshold value for trajectory");
+    app.add_option("-ee,--epsilon-env", args.threshold, "Environment threshold");
+    app.add_option("--es, --epsilon-sil", args.traj_threshold, "Silhouette threshold");
+    app.add_flag("-i, --inside-check", args.insideness_check, "Turn on the refinement for the inside regions of the envelope");
     app.add_option("-m,--max-splits", args.max_splits, "Maximum number of splits");
     app.add_option("-r,--rotation-number", args.rot, "Number of rotations");
     app.add_flag("--without-snapping", args.without_snapping, "Disable vertex snapping in iso-surfacing step");
@@ -63,6 +65,7 @@ int main(int argc, const char *argv[])
     }
     std::string output_path = args.output_path;
     int max_splits = args.max_splits;
+    bool insideness_check = args.insideness_check;
     std::string function_file = args.function_file;
     double threshold = args.threshold;
     double traj_threshold = args.traj_threshold;
@@ -223,7 +226,7 @@ int main(int argc, const char *argv[])
     std::array<size_t, timer_amount> profileCount{};
     auto starterTime = std::chrono::high_resolution_clock::now();
     spdlog::set_level(spdlog::level::off);
-    if (!gridRefine(grid, vertexMap, insideMap, implicit_sweep, threshold, traj_threshold, max_splits, profileTimer, profileCount)){
+    if (!gridRefine(grid, vertexMap, insideMap, implicit_sweep, threshold, traj_threshold, max_splits, insideness_check, profileTimer, profileCount)){
         throw std::runtime_error("ERROR: grid generation failed");
         return 0;
     };

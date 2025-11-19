@@ -23,6 +23,7 @@
 /// @param[in] threshold            The threshold for the refinement critieria of shape function.
 /// @param[in] traj_threshold            The threshold for the refinement critieria of time derivative functions.
 /// @param[in] max_splits           Max number of splits of the grid
+/// @param[in] insideness_check         Whether to enable the refinement for regions inside the sweep boundary
 /// @param[out] profileTimer            The time profiler. Details can be found in `timer.h`
 bool gridRefine(mtet::MTetMesh &grid,
                 vertExtrude &vertexMap,
@@ -31,6 +32,7 @@ bool gridRefine(mtet::MTetMesh &grid,
                 const double threshold,
                 const double traj_threshold,
                 const int max_splits,
+                const int insideness_check,
                 std::array<double, timer_amount>& profileTimer,
                 std::array<size_t, timer_amount>& profileCount);
 

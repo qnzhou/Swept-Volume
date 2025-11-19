@@ -356,110 +356,12 @@ int main(int argc, const char *argv[])
             ind ++;
         }
     }
-    arrangement::MatrixFr out_vertices;  // Output vertex matrix
-    std::vector<arrangement::MatrixIr> out_faces;     // Output face matrix
-    compute_sweep_volume(vertices, faces, out_vertices, out_faces, output_path);
-    stopperTime = std::chrono::high_resolution_clock::now();
-    auto arrangement_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
-    std::cout << "Arrangement time: " << (arrangement_end - surface_2_end) * 1e-6 << " seconds" << std::endl;
-#if time_profile
-    for (size_t i = 0; i < timer_amount; i++){
-        std::cout
-        << time_label[i] << " "
-        << profileTimer[i] << " "
-        << profileCount[i] << std::endl;
-    }
-#endif
-    igl::write_triangle_mesh(output_path + "/envelope" + ".obj", vertices, faces);
-    // Collect per-component cleaned meshes
-    std::vector<Eigen::MatrixXd> V_parts;
-    std::vector<Eigen::MatrixXi> F_parts;
-    for (size_t i = 0; i < out_faces.size(); i++){
-        Eigen::MatrixXd V_clean;
-        Eigen::MatrixXi F_clean;
-        Eigen::VectorXi I;
-        Eigen::VectorXi J;
-        igl::remove_unreferenced(out_vertices, out_faces[i], V_clean, F_clean, I, J);
-        Eigen::VectorXd labels = propagate_labels_bfs(V_clean, F_clean, timeMap);
-        backfill_timeMap_from_labels(V_clean, labels, timeMap);
-        igl::write_triangle_mesh(output_path + "/" + std::to_string(i) + ".obj", V_clean, F_clean);
-        mshio::MshSpec spec = generate_spec(V_clean, F_clean, timeMap);
-        mshio::save_msh(output_path + "/" + std::to_string(i) + ".msh", spec);
-        
-        V_parts.push_back(std::move(V_clean));
-        F_parts.push_back(std::move(F_clean));
-    }
-    
-    int totalV = 0, totalF = 0;
-    for (size_t i = 0; i < V_parts.size(); ++i) {
-        totalV += static_cast<int>(V_parts[i].rows());
-        totalF += static_cast<int>(F_parts[i].rows());
-    }
 
-    Eigen::MatrixXd V_all(totalV, 3);
-    Eigen::MatrixXi F_all(totalF, 3);
-
-    int v_off = 0, f_off = 0;
-    for (size_t i = 0; i < V_parts.size(); ++i) {
-        const auto& Vi = V_parts[i];
-        const auto& Fi = F_parts[i];
-
-        V_all.block(v_off, 0, Vi.rows(), 3) = Vi;
-
-        F_all.block(f_off, 0, Fi.rows(), 3) = (Fi.array() + v_off).matrix();
-
-        v_off += static_cast<int>(Vi.rows());
-        f_off += static_cast<int>(Fi.rows());
-    }
-
-    igl::write_triangle_mesh(output_path + "/mesh.obj", V_all, F_all);
+    auto [out_vertices, out_faces] = compute_swept_volume_from_envelope(vertices, faces);
+    igl::write_triangle_mesh(output_path + "/mesh.obj", out_vertices, out_faces);
     {
-        mshio::MshSpec spec_all = generate_spec(V_all, F_all, timeMap);
+        mshio::MshSpec spec_all = generate_spec(out_vertices, out_faces, timeMap);
         mshio::save_msh(output_path + "/mesh.msh", spec_all);
     }
-#if batch_stats
-    std::string stats_file = "stats.json";
-    {
-        std::vector<std::array<double, 3>> verts_math;
-        std::vector<std::array<size_t, 4>> simps_math;
-        std::vector<std::vector<double>> time_math;
-        std::vector<std::vector<double>> values_math;
-        convert_4d_grid_col(grid, vertexMap,
-                            verts_math,
-                            simps_math,
-                            time_math,
-                            values_math);
-        int num_non_tet_poly = 0;
-        for (uint32_t i = 0; i < contour.get_num_polyhedra(); ++i) {
-            if (!contour.is_polyhedron_regular(i)) num_non_tet_poly++;
-        }
-        int after_tris = 0;
-        for (size_t i = 0; i < out_faces.size(); i++) after_tris += out_faces[i].rows();
-        using json = nlohmann::json;
-        std::ofstream fout(stats_file.c_str(),std::ios::app);
-        json jOut;
-        jOut["grid tets"] = grid.get_num_tets();
-        jOut["contour cells"] = contour.get_num_polyhedra();
-        jOut["non_tet polys"] = num_non_tet_poly;
-        jOut["tris before arrangement"] = num_triangles;
-        jOut["tris after arrangement"] = after_tris;
-        fout << jOut.dump(4, ' ', true, json::error_handler_t::replace) << std::endl;
-        fout.close();
-    }
-#endif
-    
-#if batch_time
-    std::string time_file = "time.json";
-    {
-        using json = nlohmann::json;
-        std::ofstream fout(time_file.c_str(),std::ios::app);
-        json jOut;
-        for (size_t i = 0; i < timer_amount; i++){
-            jOut[time_label[i]] = {profileTimer[i], profileCount[i]};
-        }
-        fout << jOut.dump(4, ' ', true, json::error_handler_t::replace) << std::endl;
-        fout.close();
-    }
-#endif
     return 0;
 }

@@ -111,6 +111,55 @@ computeValidPatch(int cellNum,
     return {validPatch, owner};
 }
 
+template <typename DerivedV, typename DerivedF>
+std::tuple<arrangement::MatrixFr, arrangement::MatrixIr> compute_swept_volume_from_envelope(
+        const Eigen::MatrixBase<DerivedV>& V, const Eigen::MatrixBase<DerivedF>& F) {
+    // Compute arrangement
+    arrangement::VectorI face_labels = Eigen::VectorXi::LinSpaced(F.rows(), 0, F.rows() - 1);
+    auto engine = arrangement::Arrangement::create_mesh_arrangement(V, F, face_labels);
+    engine->run();
+
+    const auto& cell_data       = engine->get_cells();           // (#facets x 2) array
+    const auto& patches         = engine->get_patches();         // list of facet indices
+    const auto& parent_facets   = engine->get_out_face_labels();   // size = #facets
+    const auto& winding_number  = engine->get_winding_number();  // (#facets x 2) array
+
+    const auto& out_vertices = engine->get_vertices();
+    const auto& arrangement_faces = engine->get_faces();
+    size_t num_cells = engine->get_num_cells();
+    size_t num_patches = engine->get_num_patches();
+    size_t num_facets = arrangement_faces.rows();
+    assert(patches.size() == num_facets);
+
+    size_t num_valid_facets = 0;
+    std::vector<int8_t> valid(num_facets, 0);
+    for (size_t fid=0; fid < num_facets; fid++) {
+        int w0 = winding_number(fid, 0); // Winding number on the positive side
+        int w1 = winding_number(fid, 1); // Winding number on the negative side
+        if (w0 == 0 && w1 != 0) {
+            valid[fid] = 1;
+            num_valid_facets++;
+        } else if (w1 == 0 && w0 != 0) {
+            valid[fid] = -1;
+            num_valid_facets++;
+        }
+    }
+
+    size_t count = 0;
+    arrangement::MatrixIr out_facets(num_valid_facets, 3);
+    for (size_t fid=0; fid < num_facets; fid++) {
+        if (valid[fid] == 0) continue;
+        else if (valid[fid] == 1) {
+            out_facets.row(count) = arrangement_faces.row(fid);
+        } else {
+            out_facets.row(count) = arrangement_faces.row(fid).reverse();
+        }
+        count++;
+    }
+
+    return {out_vertices, out_facets};
+}
+
 
 /**
  * Compute the surface of the sweep volume.

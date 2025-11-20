@@ -20,7 +20,7 @@
 #include "post_processing.h"
 #include "timer.h"
 
-#define SAVE_CONTOUR 1
+#define SAVE_CONTOUR 0
 #define batch_stats 0
 #define batch_time 0
 
@@ -232,7 +232,7 @@ int main(int argc, const char *argv[])
     };
     spdlog::set_level(spdlog::level::info);
     /// write grid and active tets
-    mtet::save_mesh("tet_grid.msh", grid);
+    /// mtet::save_mesh("tet_grid.msh", grid);
     
     Scalar iso_value = 0.0;
     bool cyclic = args.cyclic;
@@ -302,9 +302,10 @@ int main(int argc, const char *argv[])
     auto surface_2_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
     std::cout << "Surfacing time: " << (surface_2_end - surface_1_end) * 1e-6 << " seconds (Second marching)" << std::endl;
     
-#if SAVE_CONTOUR
-    mtetcol::save_contour(output_path + "/temporal_grid.obj", contour);
     mtetcol::save_contour(output_path + "/envelope.msh", isocontour);
+#if SAVE_CONTOUR
+///    This line is to save the 3.5D grid for debugging purpose.
+    mtetcol::save_contour(output_path + "/temporal_grid.obj", contour);
     
     /// Mathematica isosurfacing output:
     std::vector<std::array<double, 3>> verts_math;

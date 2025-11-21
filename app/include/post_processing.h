@@ -13,6 +13,8 @@
 #include <chrono>
 #include <iostream>
 #include <arrangement/Arrangement.h>
+#include <lagrange/SurfaceMesh.h>
+
 const double threshold = 1e-5;
 const int faceThreshold = 200;
 
@@ -112,12 +114,14 @@ computeValidPatch(int cellNum,
 }
 
 template <typename DerivedV, typename DerivedF>
-std::tuple<arrangement::MatrixFr, arrangement::MatrixIr> compute_swept_volume_from_envelope(
+lagrange::SurfaceMesh<typename DerivedV::Scalar, uint32_t> compute_swept_volume_from_envelope(
         const Eigen::MatrixBase<DerivedV>& V, const Eigen::MatrixBase<DerivedF>& F) {
     // Compute arrangement
     arrangement::VectorI face_labels = Eigen::VectorXi::LinSpaced(F.rows(), 0, F.rows() - 1);
     auto engine = arrangement::Arrangement::create_mesh_arrangement(V, F, face_labels);
     engine->run();
+
+    lagrange::SurfaceMesh<typename DerivedV::Scalar, uint32_t> output_mesh;
 
     const auto& cell_data       = engine->get_cells();           // (#facets x 2) array
     const auto& patches         = engine->get_patches();         // list of facet indices
@@ -130,6 +134,9 @@ std::tuple<arrangement::MatrixFr, arrangement::MatrixIr> compute_swept_volume_fr
     size_t num_patches = engine->get_num_patches();
     size_t num_facets = arrangement_faces.rows();
     assert(patches.size() == num_facets);
+
+    output_mesh.add_vertices(out_vertices.rows(),
+            {out_vertices.data(), static_cast<size_t>(out_vertices.size())});
 
     size_t num_valid_facets = 0;
     std::vector<int8_t> valid(num_facets, 0);
@@ -145,19 +152,25 @@ std::tuple<arrangement::MatrixFr, arrangement::MatrixIr> compute_swept_volume_fr
         }
     }
 
-    size_t count = 0;
+    output_mesh.add_triangles(num_valid_facets);
+
     arrangement::MatrixIr out_facets(num_valid_facets, 3);
     for (size_t fid=0; fid < num_facets; fid++) {
         if (valid[fid] == 0) continue;
         else if (valid[fid] == 1) {
-            out_facets.row(count) = arrangement_faces.row(fid);
+            output_mesh.add_triangle(
+                arrangement_faces(fid, 0),
+                arrangement_faces(fid, 1),
+                arrangement_faces(fid, 2));
         } else {
-            out_facets.row(count) = arrangement_faces.row(fid).reverse();
+            output_mesh.add_triangle(
+                arrangement_faces(fid, 2),
+                arrangement_faces(fid, 1),
+                arrangement_faces(fid, 0));
         }
-        count++;
     }
 
-    return {out_vertices, out_facets};
+    return output_mesh;
 }
 
 

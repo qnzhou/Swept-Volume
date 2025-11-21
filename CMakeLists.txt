@@ -52,6 +52,7 @@ include(libigl)
 include(spdlog)
 include(arrangement)
 include(stf)
+include(lagrange)
 
 # project library
 target_compile_options(mtetcol PRIVATE -Wno-shorten-64-to-32 -Wno-logical-op-parentheses)
@@ -88,6 +89,8 @@ target_link_libraries(general_sweep PRIVATE
     CLI11::CLI11
     stf::stf
     arrangement::arrangement
+    lagrange::core
+    lagrange::io
     )
 
 option(GEN_SWEEP_TESTS "general sweep unit tests" OFF)

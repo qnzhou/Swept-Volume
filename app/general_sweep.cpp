@@ -13,6 +13,12 @@
 #include <igl/remove_unreferenced.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+
+#include <lagrange/mesh_cleanup/resolve_vertex_nonmanifoldness.h>
+#include <lagrange/mesh_cleanup/remove_topologically_degenerate_facets.h>
+#include <lagrange/io/save_mesh.h>
+
+
 #include "init_grid.h"
 #include "io.h"
 #include "col_gridgen.h"
@@ -44,8 +50,8 @@ int main(int argc, const char *argv[])
     app.add_option("grid", args.grid_file, "Initial grid file")->required();
     app.add_option("output", args.output_path, "Output path")->required();
     app.add_option("-f,--function", args.function_file, "Implicit function file");
-    app.add_option("-ee,--epsilon-env", args.threshold, "Environment threshold");
-    app.add_option("--es, --epsilon-sil", args.traj_threshold, "Silhouette threshold");
+    app.add_option("--epsilon-env", args.threshold, "Envelope threshold");
+    app.add_option("--epsilon-sil", args.traj_threshold, "Silhouette threshold");
     app.add_flag("-i, --inside-check", args.insideness_check, "Turn on the refinement for the inside regions of the envelope");
     app.add_option("-m,--max-splits", args.max_splits, "Maximum number of splits");
     app.add_option("-r,--rotation-number", args.rot, "Number of rotations");
@@ -360,11 +366,10 @@ int main(int argc, const char *argv[])
         }
     }
 
-    auto [out_vertices, out_faces] = compute_swept_volume_from_envelope(vertices, faces);
-    igl::write_triangle_mesh(output_path + "/mesh.obj", out_vertices, out_faces);
-    {
-        mshio::MshSpec spec_all = generate_spec(out_vertices, out_faces, timeMap);
-        mshio::save_msh(output_path + "/mesh.msh", spec_all);
-    }
+    auto output_mesh = compute_swept_volume_from_envelope(vertices, faces);
+    lagrange::remove_topologically_degenerate_facets(output_mesh);
+    //lagrange::resolve_vertex_nonmanifoldness(output_mesh);
+    lagrange::io::save_mesh(output_path + "/mesh.obj", output_mesh);
+    lagrange::io::save_mesh(output_path + "/mesh.msh", output_mesh);
     return 0;
 }

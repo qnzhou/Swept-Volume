@@ -169,8 +169,8 @@ void compute_sweep_volume(const arrangement::MatrixFr& vertices, const arrangeme
         Eigen::Vector3d vk = out_vertices.row(k);
         Eigen::Vector3d vl = out_vertices.row(l);
         Scalar vol = vj.dot( vk.cross(vl) );
-        volInfo[c0] += vol / 6;
-        volInfo[c1] += vol / 6;
+        volInfo[c0] += vol;
+        volInfo[c1] += vol;
         faceCountInfo[c0] += 1;
         faceCountInfo[c1] += 1;
         wind_list[c0] = winding_number(facet_idx, 0);
@@ -180,7 +180,8 @@ void compute_sweep_volume(const arrangement::MatrixFr& vertices, const arrangeme
     std::vector<bool> valid(num_cells, false);
     int valid_num = 0;
     std::cout << "valid 0-winding cell iter: ";
-    for(int i = 0; i < num_cells; ++i) {
+    for (size_t i = 0; i < num_cells; ++i) {
+        volInfo[i] = std::abs(volInfo[i]) / 6.0;
         if (volInfo[i] > threshold && faceCountInfo[i] > faceThreshold) {
             valid[i] = true;
             valid_num++;

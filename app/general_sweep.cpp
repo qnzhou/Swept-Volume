@@ -14,11 +14,9 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
-#include <lagrange/mesh_cleanup/resolve_vertex_nonmanifoldness.h>
-#include <lagrange/mesh_cleanup/remove_topologically_degenerate_facets.h>
-#include <lagrange/mesh_cleanup/remove_short_edges.h>
-#include <lagrange/mesh_cleanup/remove_degenerate_facets.h>
 #include <lagrange/io/save_mesh.h>
+#include <lagrange/mesh_cleanup/remove_degenerate_facets.h>
+#include <lagrange/mesh_cleanup/remove_topologically_degenerate_facets.h>
 #include <lagrange/views.h>
 
 
@@ -328,13 +326,6 @@ int main(int argc, const char *argv[])
             {time_values.data(), static_cast<size_t>(time_values.size())}
         );
     }
-    double envelope_bbox_diag = 0;
-    {
-        auto vertices = lagrange::vertex_view(envelope);
-        envelope_bbox_diag = (vertices.colwise().maxCoeff() - vertices.colwise().minCoeff()).norm();
-    }
-    //lagrange::remove_short_edges(envelope, envelope_bbox_diag * 1e-3);
-
 
     if (!std::filesystem::exists(output_path)) {
         // Attempt to create the directory
@@ -358,8 +349,6 @@ int main(int argc, const char *argv[])
     std::cout << "Surfacing time: " << (surface_2_end - surface_1_end) * 1e-6 << " seconds (Second marching)" << std::endl;
     
 #if SAVE_CONTOUR
-    //mtetcol::save_contour(output_path + "/temporal_grid.obj", contour);
-    //mtetcol::save_contour(output_path + "/envelope.msh", isocontour);
     lagrange::io::save_mesh(output_path + "/envelope.msh", envelope);
     
     /// Mathematica isosurfacing output:
@@ -390,14 +379,9 @@ int main(int argc, const char *argv[])
     /// End of Mathematica output
 #endif
 
-    // TODO make all tolerance relative to the grid size.
     auto sweep_surface = compute_swept_volume_from_envelope(envelope);
-    // sweep_surface = filter_tiny_components(sweep_surface, 0.05);
     lagrange::remove_topologically_degenerate_facets(sweep_surface);
     lagrange::remove_degenerate_facets(sweep_surface);
-    //lagrange::remove_short_edges(sweep_surface, 1e-3);
-    //lagrange::resolve_vertex_nonmanifoldness(output_mesh);
-    //lagrange::io::save_mesh(output_path + "/mesh.obj", output_mesh);
     lagrange::io::save_mesh(output_path + "/mesh.msh", sweep_surface);
     return 0;
 }

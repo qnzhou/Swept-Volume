@@ -392,7 +392,8 @@ void compute_sweep_volume(const arrangement::MatrixFr& vertices, const arrangeme
     std::vector<bool> valid(num_cells, false);
     int valid_num = 0;
     std::cout << "valid 0-winding cell iter: ";
-    for(int i = 0; i < num_cells; ++i) {
+    for (size_t i = 0; i < num_cells; ++i) {
+        volInfo[i] = std::abs(volInfo[i]) / 6.0;
         if (volInfo[i] > threshold && faceCountInfo[i] > faceThreshold) {
             valid[i] = true;
             valid_num++;

@@ -52,8 +52,8 @@ The input of this program is any generalized sweep that is represented by a smoo
 - `-f, --function <file>` : Specify an implicit function file or predefined function name. Can be:
   - A predefined function name (e.g., `fertility_v4`, `kitten_dog`, `letter_L_blend`, `ball_genus_roll`, `tangle_chair_S`, `star_S`, etc.)
   - See `trajectory.h` for all available predefined functions
-- `--ee, --epsilon-env <value>` : Set the environment threshold (default: 0.0005). Lower values produce finer grids for the sweep function. This is a DOUBLE value that controls the mesh precision. This parameter corresponds to the `epsilon_env` variable stated in the paper
-- `--es, --epsilon-sil <value>` : Set the silhouette threshold (default: 0.005). Lower values produce finer grids for the silhouette function.This is a DOUBLE value that controls trajectory precision. This parameter corresponds to the `epsilon_sil` variable stated in the paper
+- `--ee, --epsilon-env <value>` : Set the envelope threshold (default: 0.0005). Lower values produce finer grids for the sweep function. This is a DOUBLE value that controls the envelope's precision. This parameter corresponds to the `epsilon_env` variable stated in the paper
+- `--es, --epsilon-sil <value>` : Set the silhouette threshold (default: 0.005). Lower values produce finer grids for the silhouette function (sweep function taking partial derivative in time).This is a DOUBLE value that controls trajectory's' precision. This parameter corresponds to the `epsilon_sil` variable stated in the paper
 - `-i, --inside-check`: Whether the grid generation will do a full grid refinement considering regions of the envelope that is inside the sweep. Turning this on will generate a complete smooth envelope with fine details for inside regions. Note that this tag may add considerable amount of time and memory. 
 
 ## Example:
@@ -74,7 +74,7 @@ This example command demonstrates how to generate a swept volume using the `brus
 - **`../output/brush_stroke_example`** : The output directory where all generated files will be saved. The tool will create this directory if it doesn't exist.
 
 #### Optional Parameters:
-- **`--ee 0.0005`** : Sets the **environment threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's gradient magnitude. A small value (like 0.0005) means:
+- **`--ee 0.0005`** : Sets the **envelope threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's complexity. A small value (like 0.0005) means:
   - High precision in capturing surface details
   - More computational time and memory usage
   - Better preservation of sharp features and fine geometric details

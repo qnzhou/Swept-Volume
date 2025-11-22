@@ -16,7 +16,10 @@
 
 #include <lagrange/mesh_cleanup/resolve_vertex_nonmanifoldness.h>
 #include <lagrange/mesh_cleanup/remove_topologically_degenerate_facets.h>
+#include <lagrange/mesh_cleanup/remove_short_edges.h>
+#include <lagrange/mesh_cleanup/remove_degenerate_facets.h>
 #include <lagrange/io/save_mesh.h>
+#include <lagrange/views.h>
 
 
 #include "init_grid.h"
@@ -286,7 +289,53 @@ int main(int argc, const char *argv[])
     // Extract isocontour
     auto isocontour = contour.isocontour(function_values, gradient_values, !args.without_snapping);
     isocontour.triangulate_cycles(!args.without_opt_triangulation);
-    isocontour.is_cycle_regular(0);
+
+    lagrange::SurfaceMesh<double, uint32_t> envelope;
+    {
+        // Port the isocontour into lagrange mesh
+        size_t num_vertices = isocontour.get_num_vertices();
+        size_t num_triangles = isocontour.get_num_cycles();
+
+        std::vector<double> time_values(num_vertices);
+        envelope.add_vertices(num_vertices);
+        envelope.add_triangles(num_triangles);
+        for (size_t i=0; i<num_vertices; i++) {
+            auto xyzt = isocontour.get_vertex(i);
+            auto pos = envelope.ref_position(i);
+            pos[0] = xyzt[0];
+            pos[1] = xyzt[1];
+            pos[2] = xyzt[2];
+            time_values[i] = xyzt[3];
+        }
+        for (size_t i=0; i<num_triangles; i++) {
+            size_t ind = 0;
+            auto tris = isocontour.get_cycle(i);
+            auto f = envelope.ref_facet_vertices(i);
+            assert(tris.size() == 3);
+            for (auto si : tris) {
+                mtetcol::Index seg_id = index(si);
+                bool seg_ori = mtetcol::orientation(si);
+                auto seg = isocontour.get_segment(seg_id);
+                f[ind] = (seg_ori ? seg[0] : seg[1]);
+                ind ++;
+            }
+        }
+        envelope.template create_attribute<double>(
+            "time",
+            lagrange::AttributeElement::Vertex,
+            lagrange::AttributeUsage::Scalar,
+            1,
+            {time_values.data(), static_cast<size_t>(time_values.size())}
+        );
+    }
+    double envelope_bbox_diag = 0;
+    {
+        auto vertices = lagrange::vertex_view(envelope);
+        envelope_bbox_diag = (vertices.colwise().maxCoeff() - vertices.colwise().minCoeff()).norm();
+    }
+    //lagrange::remove_short_edges(envelope, envelope_bbox_diag * 1e-3);
+
+
     if (!std::filesystem::exists(output_path)) {
         // Attempt to create the directory
         if (std::filesystem::create_directory(output_path)) {
@@ -309,8 +358,9 @@ int main(int argc, const char *argv[])
     std::cout << "Surfacing time: " << (surface_2_end - surface_1_end) * 1e-6 << " seconds (Second marching)" << std::endl;
     
 #if SAVE_CONTOUR
-    mtetcol::save_contour(output_path + "/temporal_grid.obj", contour);
-    mtetcol::save_contour(output_path + "/envelope.msh", isocontour);
+    //mtetcol::save_contour(output_path + "/temporal_grid.obj", contour);
+    //mtetcol::save_contour(output_path + "/envelope.msh", isocontour);
+    lagrange::io::save_mesh(output_path + "/envelope.msh", envelope);
     
     /// Mathematica isosurfacing output:
     std::vector<std::array<double, 3>> verts_math;
@@ -339,37 +389,15 @@ int main(int argc, const char *argv[])
     }
     /// End of Mathematica output
 #endif
-    arrangement::MatrixFr vertices;    // nx3 Vertex matrix
-    arrangement::MatrixIr faces;       // mx3 Face matrix
-    size_t num_vertices = isocontour.get_num_vertices();
-    size_t num_triangles = isocontour.get_num_cycles();
-    vertices.resize(num_vertices, 3);
-    faces.resize(num_triangles, 3);
-    TimeMap timeMap;
-    for (size_t i = 0; i < num_vertices; i++){
-        auto pos = isocontour.get_vertex(i);
-        vertices(i,0) = pos[0];
-        vertices(i,1) = pos[1];
-        vertices(i,2) = pos[2];
-        insert(timeMap, vertices.row(i), pos[3]);
-    }
-    for (size_t i = 0; i < num_triangles; i++){
-        size_t ind = 0;
-        auto tris = isocontour.get_cycle(i);
-        assert(tris.size() == 3);
-        for (auto si : tris) {
-            mtetcol::Index seg_id = index(si);
-            bool seg_ori = mtetcol::orientation(si);
-            auto seg = isocontour.get_segment(seg_id);
-            faces(i, ind) = (seg_ori ? seg[0] : seg[1]);
-            ind ++;
-        }
-    }
 
-    auto output_mesh = compute_swept_volume_from_envelope(vertices, faces);
-    lagrange::remove_topologically_degenerate_facets(output_mesh);
+    // TODO make all tolerance relative to the grid size.
+    auto sweep_surface = compute_swept_volume_from_envelope(envelope);
+    // sweep_surface = filter_tiny_components(sweep_surface, 0.05);
+    lagrange::remove_topologically_degenerate_facets(sweep_surface);
+    lagrange::remove_degenerate_facets(sweep_surface);
+    //lagrange::remove_short_edges(sweep_surface, 1e-3);
     //lagrange::resolve_vertex_nonmanifoldness(output_mesh);
-    lagrange::io::save_mesh(output_path + "/mesh.obj", output_mesh);
-    lagrange::io::save_mesh(output_path + "/mesh.msh", output_mesh);
+    //lagrange::io::save_mesh(output_path + "/mesh.obj", output_mesh);
+    lagrange::io::save_mesh(output_path + "/mesh.msh", sweep_surface);
     return 0;
 }

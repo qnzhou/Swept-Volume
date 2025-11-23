@@ -379,9 +379,9 @@ int main(int argc, const char *argv[])
     /// End of Mathematica output
 #endif
 
-    auto sweep_surface = compute_swept_volume_from_envelope(envelope);
-    lagrange::remove_topologically_degenerate_facets(sweep_surface);
-    lagrange::remove_degenerate_facets(sweep_surface);
-    lagrange::io::save_mesh(output_path + "/mesh.msh", sweep_surface);
+    auto sweep_arrangement = compute_envelope_arrangement(envelope);
+    auto sweep_surface = extract_sweep_surface_from_arrangement(sweep_arrangement);
+    lagrange::io::save_mesh(output_path + "/sweep_surface.msh", sweep_surface);
+    lagrange::io::save_mesh(output_path + "/arrangement.msh", sweep_arrangement);
     return 0;
 }

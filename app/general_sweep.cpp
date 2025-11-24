@@ -302,7 +302,14 @@ int main(int argc, const char *argv[])
             lagrange::AttributeUsage::Scalar,
             1
         );
+        envelope.template create_attribute<uint8_t>(
+            "regular",
+            lagrange::AttributeElement::Facet,
+            lagrange::AttributeUsage::Scalar,
+            1
+        );
         auto time_values = attribute_vector_ref<double>(envelope, "time");
+        auto regular_values = attribute_vector_ref<uint8_t>(envelope, "regular");
         for (size_t i=0; i<num_vertices; i++) {
             auto xyzt = isocontour.get_vertex(i);
             auto pos = envelope.ref_position(i);
@@ -323,6 +330,7 @@ int main(int argc, const char *argv[])
                 f[ind] = (seg_ori ? seg[0] : seg[1]);
                 ind ++;
             }
+            regular_values[i] = isocontour.is_cycle_regular(i) ? 1 : 0;
         }
     }
 

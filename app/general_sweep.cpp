@@ -294,9 +294,15 @@ int main(int argc, const char *argv[])
         size_t num_vertices = isocontour.get_num_vertices();
         size_t num_triangles = isocontour.get_num_cycles();
 
-        std::vector<double> time_values(num_vertices);
         envelope.add_vertices(num_vertices);
         envelope.add_triangles(num_triangles);
+        envelope.template create_attribute<double>(
+            "time",
+            lagrange::AttributeElement::Vertex,
+            lagrange::AttributeUsage::Scalar,
+            1
+        );
+        auto time_values = attribute_vector_ref<double>(envelope, "time");
         for (size_t i=0; i<num_vertices; i++) {
             auto xyzt = isocontour.get_vertex(i);
             auto pos = envelope.ref_position(i);
@@ -318,13 +324,6 @@ int main(int argc, const char *argv[])
                 ind ++;
             }
         }
-        envelope.template create_attribute<double>(
-            "time",
-            lagrange::AttributeElement::Vertex,
-            lagrange::AttributeUsage::Scalar,
-            1,
-            {time_values.data(), static_cast<size_t>(time_values.size())}
-        );
     }
 
     if (!std::filesystem::exists(output_path)) {

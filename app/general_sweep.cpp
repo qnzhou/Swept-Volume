@@ -294,11 +294,6 @@ int main(int argc, const char *argv[])
         std::cout << "isocontour problem" << std::endl;
         throw std::runtime_error("ERROR: extracted isocontour is not manifold");
     }
-    //isocontour.triangulate_cycles(!args.without_opt_triangulation);
-    //if (!isocontour.is_manifold()) {
-    //    std::cout << "triangulated isocontour problem" << std::endl;
-    //    throw std::runtime_error("ERROR: extracted isocontour is not manifold");
-    //}
 
     lagrange::SurfaceMesh<double, uint32_t> envelope;
     {
@@ -356,27 +351,6 @@ int main(int argc, const char *argv[])
             envelope.add_polygon({polygon.data(), polygon.size()});
         }
 
-        for (const auto& [edge, cycle_ids] : edge_valence_map) {
-            if (cycle_ids.size() > 2) {
-                std::cout << "Non-manifold edge detected in the envelope mesh." << std::endl;
-                std::cout << "Edge " << edge.first << ", " << edge.second << " is shared by "
-                          << cycle_ids.size() << " cycles:" << std::endl;
-                for (auto cid : cycle_ids) {
-                    std::cout << "  Cycle " << cid << ": ";
-                    auto cycle = isocontour.get_cycle(cid);
-                    for (auto si : cycle) {
-                        mtetcol::Index seg_id = index(si);
-                        bool seg_ori = mtetcol::orientation(si);
-                        auto seg = isocontour.get_segment(seg_id);
-                        std::cout << (seg_ori ? "+" : "-") << seg_id + 1 << " (";
-                        std::cout << (seg_ori ? seg[0] : seg[1]) << " "
-                            << (seg_ori ? seg[1] : seg[0]) << ") ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
-        }
-
         // Add regular attribute
         envelope.template create_attribute<uint8_t>(
             "regular",
@@ -412,9 +386,6 @@ int main(int argc, const char *argv[])
 
     lagrange::io::save_mesh(output_path + "/envelope.obj", envelope);
     envelope.initialize_edges();
-    //if (!lagrange::is_manifold(envelope)) {
-    //    throw std::runtime_error("ERROR: lagrange envelope is not manifold");
-    //}
     lagrange::triangulate_polygonal_facets(envelope);
 
     

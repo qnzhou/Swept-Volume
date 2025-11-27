@@ -14,7 +14,6 @@
 #include <lagrange/views.h>
 
 #include <algorithm>
-#include <iostream>
 
 template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
@@ -96,16 +95,6 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
             // It can be safely removed without affecting other cells and their
             // winding numbers
             cell_is_isolated[cid] = true;
-        }
-    }
-
-    // Debug print out
-    for (size_t cid = 0; cid < num_cells; cid++) {
-        if (std::abs(cell_volumes[cid]) >= vol_threshold) {
-            std::cout << cid << ": volume = " << cell_volumes[cid]
-                      << ", face count = " << cell_face_counts[cid]
-                      << ", is_isolated = " << cell_is_isolated[cid]
-                      << std::endl;
         }
     }
 

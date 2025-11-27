@@ -18,6 +18,9 @@
 #include <lagrange/mesh_cleanup/remove_degenerate_facets.h>
 #include <lagrange/mesh_cleanup/remove_topologically_degenerate_facets.h>
 #include <lagrange/views.h>
+#include <lagrange/topology.h>
+#include <lagrange/utils/SmallVector.h>
+#include <lagrange/triangulate_polygonal_facets.h>
 
 
 #include "init_grid.h"
@@ -238,8 +241,6 @@ int main(int argc, const char *argv[])
         return 0;
     };
     spdlog::set_level(spdlog::level::info);
-    /// write grid and active tets
-    /// mtet::save_mesh("tet_grid.msh", grid);
     
     Scalar iso_value = 0.0;
     bool cyclic = args.cyclic;
@@ -269,6 +270,9 @@ int main(int argc, const char *argv[])
     columns.set_time_samples(time_func, values_func);
     
     auto contour = columns.extract_contour(iso_value, cyclic);
+    if (!contour.is_manifold()) {
+        throw std::runtime_error("ERROR: extracted contour is not manifold");
+    }
     stopperTime = std::chrono::high_resolution_clock::now();
     auto surface_1_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
     std::cout << "Surfacing time: " << (surface_1_end - grid_end) * 1e-6 << " seconds (First marching)" << std::endl;
@@ -286,30 +290,32 @@ int main(int argc, const char *argv[])
     }
     // Extract isocontour
     auto isocontour = contour.isocontour(function_values, gradient_values, !args.without_snapping);
-    isocontour.triangulate_cycles(!args.without_opt_triangulation);
+    if (!isocontour.is_manifold()) {
+        std::cout << "isocontour problem" << std::endl;
+        throw std::runtime_error("ERROR: extracted isocontour is not manifold");
+    }
+    //isocontour.triangulate_cycles(!args.without_opt_triangulation);
+    //if (!isocontour.is_manifold()) {
+    //    std::cout << "triangulated isocontour problem" << std::endl;
+    //    throw std::runtime_error("ERROR: extracted isocontour is not manifold");
+    //}
 
     lagrange::SurfaceMesh<double, uint32_t> envelope;
     {
         // Port the isocontour into lagrange mesh
         size_t num_vertices = isocontour.get_num_vertices();
-        size_t num_triangles = isocontour.get_num_cycles();
+        size_t num_cycles= isocontour.get_num_cycles();
 
+        // Add vertices and time
         envelope.add_vertices(num_vertices);
-        envelope.add_triangles(num_triangles);
         envelope.template create_attribute<double>(
             "time",
             lagrange::AttributeElement::Vertex,
             lagrange::AttributeUsage::Scalar,
             1
         );
-        envelope.template create_attribute<uint8_t>(
-            "regular",
-            lagrange::AttributeElement::Facet,
-            lagrange::AttributeUsage::Scalar,
-            1
-        );
         auto time_values = attribute_vector_ref<double>(envelope, "time");
-        auto regular_values = attribute_vector_ref<uint8_t>(envelope, "regular");
+
         for (size_t i=0; i<num_vertices; i++) {
             auto xyzt = isocontour.get_vertex(i);
             auto pos = envelope.ref_position(i);
@@ -318,22 +324,71 @@ int main(int argc, const char *argv[])
             pos[2] = xyzt[2];
             time_values[i] = xyzt[3];
         }
-        for (size_t i=0; i<num_triangles; i++) {
+
+        ankerl::unordered_dense::map<std::pair<mtetcol::Index, mtetcol::Index>, std::vector<size_t>> edge_valence_map;
+
+        // Add polygons
+        lagrange::SmallVector<uint32_t, 16> polygon;
+        for (size_t i=0; i<num_cycles; i++) {
+            auto cycle = isocontour.get_cycle(i);
+            size_t cycle_size = cycle.size();
+            polygon.clear();
+            polygon.resize(cycle_size);
+
             size_t ind = 0;
-            auto tris = isocontour.get_cycle(i);
-            auto f = envelope.ref_facet_vertices(i);
-            assert(tris.size() == 3);
-            for (auto si : tris) {
+            for (auto si : cycle) {
                 mtetcol::Index seg_id = index(si);
                 bool seg_ori = mtetcol::orientation(si);
                 auto seg = isocontour.get_segment(seg_id);
-                f[ind] = (seg_ori ? seg[0] : seg[1]);
+                polygon[ind] = (seg_ori ? seg[0] : seg[1]);
+                std::pair<mtetcol::Index, mtetcol::Index> edge_key = {
+                    std::min(seg[0], seg[1]),
+                    std::max(seg[0], seg[1])
+                };
+
+                if (edge_valence_map.find(edge_key) == edge_valence_map.end()) {
+                    edge_valence_map[edge_key] = {};
+                }
+                edge_valence_map[edge_key].push_back(i);
+
                 ind ++;
             }
+            envelope.add_polygon({polygon.data(), polygon.size()});
+        }
+
+        for (const auto& [edge, cycle_ids] : edge_valence_map) {
+            if (cycle_ids.size() > 2) {
+                std::cout << "Non-manifold edge detected in the envelope mesh." << std::endl;
+                std::cout << "Edge " << edge.first << ", " << edge.second << " is shared by "
+                          << cycle_ids.size() << " cycles:" << std::endl;
+                for (auto cid : cycle_ids) {
+                    std::cout << "  Cycle " << cid << ": ";
+                    auto cycle = isocontour.get_cycle(cid);
+                    for (auto si : cycle) {
+                        mtetcol::Index seg_id = index(si);
+                        bool seg_ori = mtetcol::orientation(si);
+                        auto seg = isocontour.get_segment(seg_id);
+                        std::cout << (seg_ori ? "+" : "-") << seg_id + 1 << " (";
+                        std::cout << (seg_ori ? seg[0] : seg[1]) << " "
+                            << (seg_ori ? seg[1] : seg[0]) << ") ";
+                    }
+                    std::cout << std::endl;
+                }
+            }
+        }
+
+        // Add regular attribute
+        envelope.template create_attribute<uint8_t>(
+            "regular",
+            lagrange::AttributeElement::Facet,
+            lagrange::AttributeUsage::Scalar,
+            1
+        );
+        auto regular_values = attribute_vector_ref<uint8_t>(envelope, "regular");
+        for (size_t i=0; i<num_cycles; i++) {
             regular_values[i] = isocontour.is_cycle_regular(i) ? 1 : 0;
         }
     }
-
     if (!std::filesystem::exists(output_path)) {
         // Attempt to create the directory
         if (std::filesystem::create_directory(output_path)) {
@@ -354,9 +409,16 @@ int main(int argc, const char *argv[])
     stopperTime = std::chrono::high_resolution_clock::now();
     auto surface_2_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
     std::cout << "Surfacing time: " << (surface_2_end - surface_1_end) * 1e-6 << " seconds (Second marching)" << std::endl;
+
+    lagrange::io::save_mesh(output_path + "/envelope.obj", envelope);
+    envelope.initialize_edges();
+    //if (!lagrange::is_manifold(envelope)) {
+    //    throw std::runtime_error("ERROR: lagrange envelope is not manifold");
+    //}
+    lagrange::triangulate_polygonal_facets(envelope);
+
     
 #if SAVE_CONTOUR
-    lagrange::io::save_mesh(output_path + "/envelope.msh", envelope);
     
     /// Mathematica isosurfacing output:
     std::vector<std::array<double, 3>> verts_math;
@@ -390,5 +452,6 @@ int main(int argc, const char *argv[])
     auto sweep_surface = extract_sweep_surface_from_arrangement(sweep_arrangement);
     lagrange::io::save_mesh(output_path + "/sweep_surface.msh", sweep_surface);
     lagrange::io::save_mesh(output_path + "/arrangement.msh", sweep_arrangement);
+    mtet::save_mesh(output_path + "/tet_grid.msh", grid);
     return 0;
 }

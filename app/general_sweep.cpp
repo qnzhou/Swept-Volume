@@ -20,7 +20,6 @@
 #include <lagrange/views.h>
 #include <lagrange/topology.h>
 #include <lagrange/utils/SmallVector.h>
-#include <lagrange/triangulate_polygonal_facets.h>
 
 
 #include "init_grid.h"
@@ -294,6 +293,7 @@ int main(int argc, const char *argv[])
         std::cout << "isocontour problem" << std::endl;
         throw std::runtime_error("ERROR: extracted isocontour is not manifold");
     }
+    isocontour.triangulate_cycles(!args.without_opt_triangulation);
 
     lagrange::SurfaceMesh<double, uint32_t> envelope;
     {
@@ -386,7 +386,6 @@ int main(int argc, const char *argv[])
 
     lagrange::io::save_mesh(output_path + "/envelope.obj", envelope);
     envelope.initialize_edges();
-    lagrange::triangulate_polygonal_facets(envelope);
 
     
 #if SAVE_CONTOUR

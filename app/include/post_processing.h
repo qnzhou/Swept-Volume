@@ -45,6 +45,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     size_t num_patches = engine->get_num_patches();
     size_t num_facets = arrangement_faces.rows();
     assert(patches.size() == num_facets);
+    assert(cell_data.rows() == num_patches);
 
     sweep_arrangement.add_vertices(
         static_cast<Index>(out_vertices.rows()),
@@ -55,24 +56,41 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         std::copy_n(arrangement_faces.data(), arrangement_faces.size(),
                     facets.data());
     }
-    sweep_arrangement.template create_attribute<Index>("envelop_facet_id",
-            lagrange::AttributeElement::Facet,
-            lagrange::AttributeUsage::Scalar, 1);
-    auto envelop_facet_id = attribute_vector_ref<Index>(sweep_arrangement, "envelop_facet_id");
-    std::copy_n(parent_facets.data(), parent_facets.size(), envelop_facet_id.data());
+    sweep_arrangement.template create_attribute<Index>(
+        "envelop_facet_id", lagrange::AttributeElement::Facet,
+        lagrange::AttributeUsage::Scalar, 1);
+    auto envelop_facet_id =
+        attribute_vector_ref<Index>(sweep_arrangement, "envelop_facet_id");
+    std::copy_n(parent_facets.data(), parent_facets.size(),
+                envelop_facet_id.data());
     sweep_arrangement.initialize_edges();
 
     // Build cell adjacency graph and compute cell volumes
     constexpr Scalar vol_threshold = 1e-5;
     constexpr size_t face_count_threshold = 200;
+    constexpr int32_t invalid_winding_number = std::numeric_limits<int32_t>::max();
     std::vector<ankerl::unordered_dense::set<Index>> cell_graph(num_cells);
     std::vector<Scalar> cell_volumes(num_cells, 0);
     std::vector<size_t> cell_face_counts(num_cells, 0);
+    std::vector<int32_t> cell_winding_numbers(num_cells, invalid_winding_number);
     for (size_t fid = 0; fid < num_facets; fid++) {
         Index c0 = static_cast<Index>(
             cell_data(patches[fid], 0));  // Cell on the positive side
         Index c1 = static_cast<Index>(
             cell_data(patches[fid], 1));  // Cell on the negative side
+        int w0 = winding_number(fid, 0);  // Winding number on the positive side
+        int w1 = winding_number(fid, 1);  // Winding number on the negative side
+
+        if (cell_winding_numbers[c0] == invalid_winding_number) {
+            cell_winding_numbers[c0] = w0;
+        } else {
+            assert(cell_winding_numbers[c0] == w0);
+        }
+        if (cell_winding_numbers[c1] == invalid_winding_number) {
+            cell_winding_numbers[c1] = w1;
+        } else {
+            assert(cell_winding_numbers[c1] == w1);
+        }
 
         cell_graph[c0].insert(c1);
         cell_graph[c1].insert(c0);
@@ -83,21 +101,43 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         Point p2 = out_vertices.row(f[2]).template cast<Scalar>();
         Scalar vol = p0.dot((p1).cross(p2));
 
-        cell_volumes[c0] += vol / 6;
-        cell_volumes[c1] -= vol / 6;
+        cell_volumes[c0] -= vol / 6;
+        cell_volumes[c1] += vol / 6;
         cell_face_counts[c0]++;
         cell_face_counts[c1]++;
     }
-    std::vector<bool> cell_is_isolated(num_cells, false);
-    for (size_t cid = 0; cid < num_cells; cid++) {
-        if (cell_graph[cid].size() <= 1) {
-            // Cell is completely embedded in another cell
-            // It can be safely removed without affecting other cells and their
-            // winding numbers
-            cell_is_isolated[cid] = true;
-        }
-    }
+    auto cell_is_small = [&](Index cid) {
+        return (std::abs(cell_volumes[cid]) < vol_threshold ||
+                cell_face_counts[cid] < face_count_threshold);
+    };
+    ///
+    /// Determine if a cell is a floater
+    ///
+    /// A floater cell is a cell of small volume or small triangle count and is surrounded by cells
+    /// with the same winding number. Floater cells can be safely ignored when extracting
+    /// winding-number-based cell boundaries.
+    ///
+    auto cell_is_floater = [&](Index cid) {
+        if (!cell_is_small(cid)) return false;
 
+        bool consistent = true;
+        int32_t adj_winding_number = invalid_winding_number;
+        for (auto adj_cid : cell_graph[cid]) {
+            auto w = cell_winding_numbers[adj_cid];
+            if (adj_winding_number == invalid_winding_number) {
+                adj_winding_number = w;
+            } else if (adj_winding_number != w) {
+                consistent = false;
+                break;
+            }
+        }
+        return consistent;
+    };
+
+    std::vector<bool> is_floater(num_cells, false);
+    for (size_t cid = 0; cid < num_cells; cid++) {
+        is_floater[cid] = cell_is_floater(cid);
+    }
 
     // Compute sweep surface facets
     sweep_arrangement.template create_attribute<int8_t>(
@@ -112,14 +152,9 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         int c0 = cell_data(patches[fid], 0);  // Cell on the positive side
         int c1 = cell_data(patches[fid], 1);  // Cell on the negative side
 
-        if (cell_is_isolated[c0] &&
-            std::abs(cell_volumes[c0]) < vol_threshold &&
-            cell_face_counts[c0] < face_count_threshold)
+        if (is_floater[c0] || is_floater[c1]) {
             continue;
-        if (cell_is_isolated[c1] &&
-            std::abs(cell_volumes[c1]) < vol_threshold &&
-            cell_face_counts[c1] < face_count_threshold)
-            continue;
+        }
 
         if (w0 == 0 && w1 != 0) {
             is_valid[fid] = 1;
@@ -201,7 +236,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
 
 template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
-        lagrange::SurfaceMesh<Scalar, Index>& sweep_arrangement) {
+    lagrange::SurfaceMesh<Scalar, Index>& sweep_arrangement) {
     Index num_arrangment_facets = sweep_arrangement.get_num_facets();
     auto V = vertex_view(sweep_arrangement);
     auto F = facet_view(sweep_arrangement);
@@ -209,9 +244,8 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
     auto time_values = attribute_vector_view<Scalar>(sweep_arrangement, "time");
 
     lagrange::SurfaceMesh<Scalar, Index> sweep_surface;
-    sweep_surface.add_vertices(
-        static_cast<Index>(V.rows()),
-        {V.data(), static_cast<size_t>(V.size())});
+    sweep_surface.add_vertices(static_cast<Index>(V.rows()),
+                               {V.data(), static_cast<size_t>(V.size())});
 
     Index num_valid_facets = 0;
     for (Index fid = 0; fid < num_arrangment_facets; fid++) {
@@ -244,15 +278,22 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
             continue;
         }
         const Index sweep_c_begin = sweep_surface.get_facet_corner_begin(count);
-        const Index arrang_c_begin = sweep_arrangement.get_facet_corner_begin(fid);
+        const Index arrang_c_begin =
+            sweep_arrangement.get_facet_corner_begin(fid);
         if (is_valid[fid] == 1) {
-            sweep_time_values[sweep_c_begin + 0] = time_values[arrang_c_begin + 0];
-            sweep_time_values[sweep_c_begin + 1] = time_values[arrang_c_begin + 1];
-            sweep_time_values[sweep_c_begin + 2] = time_values[arrang_c_begin + 2];
+            sweep_time_values[sweep_c_begin + 0] =
+                time_values[arrang_c_begin + 0];
+            sweep_time_values[sweep_c_begin + 1] =
+                time_values[arrang_c_begin + 1];
+            sweep_time_values[sweep_c_begin + 2] =
+                time_values[arrang_c_begin + 2];
         } else {
-            sweep_time_values[sweep_c_begin + 0] = time_values[arrang_c_begin + 2];
-            sweep_time_values[sweep_c_begin + 1] = time_values[arrang_c_begin + 1];
-            sweep_time_values[sweep_c_begin + 2] = time_values[arrang_c_begin + 0];
+            sweep_time_values[sweep_c_begin + 0] =
+                time_values[arrang_c_begin + 2];
+            sweep_time_values[sweep_c_begin + 1] =
+                time_values[arrang_c_begin + 1];
+            sweep_time_values[sweep_c_begin + 2] =
+                time_values[arrang_c_begin + 0];
         }
         count++;
     }

@@ -84,11 +84,19 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         if (cell_winding_numbers[c0] == invalid_winding_number) {
             cell_winding_numbers[c0] = w0;
         } else {
+            if (cell_winding_numbers[c0] != w0) {
+                // This should never happen
+                throw std::runtime_error("Inconsistent winding numbers detected!");
+            }
             assert(cell_winding_numbers[c0] == w0);
         }
         if (cell_winding_numbers[c1] == invalid_winding_number) {
             cell_winding_numbers[c1] = w1;
         } else {
+            if (cell_winding_numbers[c1] != w1) {
+                // This should never happen
+                throw std::runtime_error("Inconsistent winding numbers detected!");
+            }
             assert(cell_winding_numbers[c1] == w1);
         }
 
@@ -110,34 +118,29 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         return (std::abs(cell_volumes[cid]) < vol_threshold ||
                 cell_face_counts[cid] < face_count_threshold);
     };
-    ///
-    /// Determine if a cell is a floater
-    ///
-    /// A floater cell is a cell of small volume or small triangle count and is surrounded by cells
-    /// with the same winding number. Floater cells can be safely ignored when extracting
-    /// winding-number-based cell boundaries.
-    ///
-    auto cell_is_floater = [&](Index cid) {
-        if (!cell_is_small(cid)) return false;
 
-        bool consistent = true;
-        int32_t adj_winding_number = invalid_winding_number;
-        for (auto adj_cid : cell_graph[cid]) {
-            auto w = cell_winding_numbers[adj_cid];
-            if (adj_winding_number == invalid_winding_number) {
-                adj_winding_number = w;
-            } else if (adj_winding_number != w) {
-                consistent = false;
-                break;
-            }
-        }
-        return consistent;
-    };
-
-    std::vector<bool> is_floater(num_cells, false);
+    std::vector<int> parent_cell(num_cells);
+    std::iota(parent_cell.begin(), parent_cell.end(), 0);
     for (size_t cid = 0; cid < num_cells; cid++) {
-        is_floater[cid] = cell_is_floater(cid);
+        if (cell_is_small(cid)) {
+            // Union small cell with one of its neighbors
+            int parent = parent_cell[cid];
+            Scalar max_vol = std::abs(cell_volumes[cid]);
+            for (auto adj_cid : cell_graph[cid]) {
+                if (cell_volumes[adj_cid] > max_vol) {
+                    max_vol = std::abs(cell_volumes[adj_cid]);
+                    parent = adj_cid;
+                }
+            }
+            parent_cell[cid] = parent;
+        }
     }
+    auto get_parent = [&](int cid) {
+        while (parent_cell[cid] != cid) {
+            cid = parent_cell[cid];
+        }
+        return cid;
+    };
 
     // Compute sweep surface facets
     sweep_arrangement.template create_attribute<int8_t>(
@@ -147,14 +150,12 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     is_valid.setZero();
     size_t num_valid_facets = 0;
     for (size_t fid = 0; fid < num_facets; fid++) {
-        int w0 = winding_number(fid, 0);  // Winding number on the positive side
-        int w1 = winding_number(fid, 1);  // Winding number on the negative side
         int c0 = cell_data(patches[fid], 0);  // Cell on the positive side
         int c1 = cell_data(patches[fid], 1);  // Cell on the negative side
-
-        if (is_floater[c0] || is_floater[c1]) {
-            continue;
-        }
+        c0 = get_parent(c0); // Find the representative parent cell
+        c1 = get_parent(c1); // Find the representative parent cell
+        int w0 = cell_winding_numbers[c0]; // Winding number on the positive side
+        int w1 = cell_winding_numbers[c1]; // Winding number on the negative side
 
         if (w0 == 0 && w1 != 0) {
             is_valid[fid] = 1;

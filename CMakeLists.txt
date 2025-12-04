@@ -59,10 +59,11 @@ target_compile_options(mtetcol PRIVATE -Wno-shorten-64-to-32 -Wno-logical-op-par
 set(TBB_STRICT           OFF CACHE BOOL   "" FORCE)
 set(TBB_WARNING_SUPPRESS "-Wno-shorten-64-to-32" CACHE STRING "" FORCE)
 file(GLOB SRC_FILES ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp ${CMAKE_CURRENT_LIST_DIR}/src/*.h)
-add_library(adaptive_column_grid STATIC ${SRC_FILES})
-target_include_directories(adaptive_column_grid PUBLIC
-     ${CMAKE_CURRENT_LIST_DIR}/src)
-target_link_libraries(adaptive_column_grid
+add_library(sweep STATIC ${SRC_FILES})
+target_include_directories(sweep PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/src)
+target_link_libraries(sweep
     PUBLIC 
     Eigen3::Eigen
     mtet::mtet 
@@ -76,6 +77,7 @@ target_link_libraries(adaptive_column_grid
     spdlog::spdlog
     OpenMP::OpenMP_CXX
     lagrange::core
+    arrangement::arrangement
     )
 
 file(GLOB SWEEP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/app/include/*.h)
@@ -86,10 +88,9 @@ target_compile_definitions(general_sweep PRIVATE -DDATA_DIR="${CMAKE_CURRENT_LIS
 target_include_directories(general_sweep PRIVATE ${CMAKE_CURRENT_LIST_DIR}/app/include)
 target_sources(general_sweep PRIVATE ${SWEEP_HEADERS})
 target_link_libraries(general_sweep PRIVATE
-    adaptive_column_grid
+    sweep
     CLI11::CLI11
     stf::stf
-    arrangement::arrangement
     lagrange::core
     lagrange::io
     )
@@ -104,7 +105,7 @@ if (GEN_SWEEP_TESTS)
  add_executable(sweep_volume_test ${TEST_FILES})
  target_link_libraries(sweep_volume_test
     PRIVATE 
-    adaptive_column_grid
+    sweep
     Catch2::Catch2
     mtet::mtet
     mtetcol::mtetcol

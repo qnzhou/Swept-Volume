@@ -208,9 +208,9 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
             parent_cell[cid] = parent;
         }
     }
-    auto get_parent = [&](int cid) -> int {
+    auto get_parent = [&](auto&& self, int cid) -> int {
         if (parent_cell[cid] != cid) {
-            parent_cell[cid] = get_parent(parent_cell[cid]);
+            parent_cell[cid] = self(self, parent_cell[cid]);
         }
         return parent_cell[cid];
     };
@@ -225,8 +225,8 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     for (size_t fid = 0; fid < num_facets; fid++) {
         int c0 = cell_data(patches[fid], 0);  // Cell on the positive side
         int c1 = cell_data(patches[fid], 1);  // Cell on the negative side
-        c0 = get_parent(c0);  // Find the representative parent cell
-        c1 = get_parent(c1);  // Find the representative parent cell
+        c0 = get_parent(get_parent, c0);  // Find the representative parent cell
+        c1 = get_parent(get_parent, c1);  // Find the representative parent cell
         int w0 =
             cell_winding_numbers[c0];  // Winding number on the positive side
         int w1 =
@@ -275,15 +275,9 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         Scalar t0 = interpolate_time(parent_fid, p0);
         Scalar t1 = interpolate_time(parent_fid, p1);
         Scalar t2 = interpolate_time(parent_fid, p2);
-        if (is_valid[fid] == 1) {
-            time_values[3 * idx + 0] = t0;
-            time_values[3 * idx + 1] = t1;
-            time_values[3 * idx + 2] = t2;
-        } else {
-            time_values[3 * idx + 0] = t2;
-            time_values[3 * idx + 1] = t1;
-            time_values[3 * idx + 2] = t0;
-        }
+        time_values[3 * idx + 0] = t0;
+        time_values[3 * idx + 1] = t1;
+        time_values[3 * idx + 2] = t2;
     }
 
     // Extract feature edges

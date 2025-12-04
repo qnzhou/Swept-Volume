@@ -313,7 +313,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
 template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
     lagrange::SurfaceMesh<Scalar, Index>& sweep_arrangement) {
-    Index num_arrangment_facets = sweep_arrangement.get_num_facets();
+    Index num_arrangement_facets = sweep_arrangement.get_num_facets();
     auto V = vertex_view(sweep_arrangement);
     auto F = facet_view(sweep_arrangement);
     auto is_valid = attribute_vector_view<int8_t>(sweep_arrangement, "valid");
@@ -324,14 +324,14 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
                                {V.data(), static_cast<size_t>(V.size())});
 
     Index num_valid_facets = 0;
-    for (Index fid = 0; fid < num_arrangment_facets; fid++) {
+    for (Index fid = 0; fid < num_arrangement_facets; fid++) {
         if (is_valid[fid] != 0) num_valid_facets++;
     }
     sweep_surface.add_triangles(num_valid_facets);
     auto sweep_F = facet_ref(sweep_surface);
 
     Index count = 0;
-    for (Index fid = 0; fid < num_arrangment_facets; fid++) {
+    for (Index fid = 0; fid < num_arrangement_facets; fid++) {
         if (is_valid[fid] == 0) {
             continue;
         } else if (is_valid[fid] == 1) {
@@ -349,7 +349,7 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
         attribute_vector_ref<Scalar>(sweep_surface, "time");
 
     count = 0;
-    for (Index fid = 0; fid < num_arrangment_facets; fid++) {
+    for (Index fid = 0; fid < num_arrangement_facets; fid++) {
         if (is_valid[fid] == 0) {
             continue;
         }

@@ -1,8 +1,3 @@
-#include "adaptive_column_grid.h"
-#include "col_gridgen.h"
-#include "io.h"
-#include "post_processing.h"
-
 #include <generalized_sweep/generalized_sweep.h>
 #include <mtet/grid.h>
 #include <mtetcol/contour.h>
@@ -11,6 +6,11 @@
 #include <array>
 #include <iostream>
 #include <vector>
+
+#include "adaptive_column_grid.h"
+#include "col_gridgen.h"
+#include "io.h"
+#include "post_processing.h"
 
 namespace sweep {
 
@@ -23,7 +23,8 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     vertExtrude vertexMap;
     insidenessMap insideMap;
 
-    // TODO: Clarify the purpose of these timers and whether they're still needed.
+    // TODO: Clarify the purpose of these timers and whether they're still
+    // needed.
     std::array<double, timer_amount> profileTimer{};
     std::array<size_t, timer_amount> profileCount{};
     spdlog::set_level(spdlog::level::off);
@@ -107,7 +108,8 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
 
     result.envelope = compute_envelope(f, contour, options);
 
-    result.arrangement = compute_envelope_arrangement(result.envelope);
+    result.arrangement = compute_envelope_arrangement(
+        result.envelope, options.volume_threshold, options.face_count_threshold);
 
     result.sweep_surface =
         extract_sweep_surface_from_arrangement(result.arrangement);

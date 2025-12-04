@@ -294,7 +294,7 @@ void save_grid_for_mathematica(
                         values_math);
     {
         using json = nlohmann::json;
-        std::ofstream fout(filename.data(),std::ios::app);
+        std::ofstream fout(filename.data(),std::ios::out);
         if (!fout) {
             throw std::runtime_error("Failed to open file for writing");
         }
@@ -304,7 +304,6 @@ void save_grid_for_mathematica(
         jOut.push_back(json(time_math));
         jOut.push_back(json(values_math));
         fout << jOut.dump(4, ' ', true, json::error_handler_t::replace) << std::endl;
-        fout.close();
     }
     /// End of Mathematica output
 }

@@ -95,6 +95,18 @@ struct SweepOptions {
     ///
     /// This feature is experimental and is not fully supported.
     bool cyclic = false;
+
+    /// Minimum volume threshold for arrangement cell filtering.
+    ///
+    /// Filtered arrangement cells will be merged into adjacent cells during the sweep surface
+    /// extraction step.
+    Scalar volume_threshold = 1e-5;
+
+    /// Minimum face count threshold for arrangement cell filtering.
+    ///
+    /// Filtered arrangement cells will be merged into adjacent cells during the sweep surface
+    /// extraction step.
+    size_t face_count_threshold = 200;
 };
 
 ///

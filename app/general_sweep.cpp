@@ -251,7 +251,7 @@ int main(int argc, const char *argv[])
         using json = nlohmann::json;
         std::ifstream fin(args.grid_file.c_str());
         if (!fin) {
-            throw std::runtime_error("tet mesh file not exist!");
+            throw std::runtime_error("Grid file does not exist!");
         }
         json data;
         fin >> data;
@@ -289,8 +289,7 @@ int main(int argc, const char *argv[])
     options.with_insideness_check = insideness_check;
     options.with_snapping = !args.without_snapping;
     options.cyclic = args.cyclic;
-    auto result = sweep::generalized_sweep(implicit_sweep, std::move(grid_spec),
-            std::move(options));
+    auto result = sweep::generalized_sweep(implicit_sweep, grid_spec, options);
     auto& envelope = result.envelope;
     auto& sweep_surface = result.sweep_surface;
     auto& sweep_arrangement = result.arrangement;

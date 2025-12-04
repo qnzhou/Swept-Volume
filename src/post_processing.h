@@ -86,7 +86,9 @@ lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
 
 template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
-    const lagrange::SurfaceMesh<Scalar, Index>& envelope) {
+    const lagrange::SurfaceMesh<Scalar, Index>& envelope,
+    Scalar vol_threshold,
+    size_t face_count_threshold) {
     using Point = Eigen::Matrix<Scalar, 3, 1>;
 
     // Compute arrangement
@@ -135,8 +137,6 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     sweep_arrangement.initialize_edges();
 
     // Build cell adjacency graph and compute cell volumes
-    constexpr Scalar vol_threshold = 1e-5;
-    constexpr size_t face_count_threshold = 200;
     constexpr int32_t invalid_winding_number =
         std::numeric_limits<int32_t>::max();
     std::vector<ankerl::unordered_dense::set<Index>> cell_graph(num_cells);
@@ -160,7 +160,6 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
                 throw std::runtime_error(
                     "Inconsistent winding numbers detected!");
             }
-            assert(cell_winding_numbers[c0] == w0);
         }
         if (cell_winding_numbers[c1] == invalid_winding_number) {
             cell_winding_numbers[c1] = w1;
@@ -170,7 +169,6 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
                 throw std::runtime_error(
                     "Inconsistent winding numbers detected!");
             }
-            assert(cell_winding_numbers[c1] == w1);
         }
 
         cell_graph[c0].insert(c1);
@@ -254,7 +252,13 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         Scalar b0 = ((p1 - p).cross(p2 - p)).norm();
         Scalar b1 = ((p2 - p).cross(p0 - p)).norm();
         Scalar b2 = ((p0 - p).cross(p1 - p)).norm();
-        return (t0 * b0 + t1 * b1 + t2 * b2) / (b0 + b1 + b2);
+        Scalar denom = b0 + b1 + b2;
+        if (std::abs(denom) > std::numeric_limits<Scalar>::epsilon()) {
+            return (t0 * b0 + t1 * b1 + t2 * b2) / denom;
+        } else {
+            // Simple average to avoid numerical issues
+            return (t0 + t1 + t2) / Scalar(3);
+        }
     };
 
     sweep_arrangement.template create_attribute<Scalar>(

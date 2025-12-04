@@ -292,6 +292,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         lagrange::AttributeUsage::Scalar, 1);
     auto is_feature =
         attribute_vector_ref<int8_t>(sweep_arrangement, "is_feature");
+    is_feature.setZero();
     Index num_edges = sweep_arrangement.get_num_edges();
     for (Index eid = 0; eid < num_edges; eid++) {
         Index edge_valence =

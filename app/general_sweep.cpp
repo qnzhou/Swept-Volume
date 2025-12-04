@@ -33,6 +33,9 @@ template <typename Scalar, typename Index>
 void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Index>& arrangement)
 {
     std::ofstream fout(filename.data());
+    if (!fout) {
+        throw std::runtime_error("Failed to open file: " + std::string(filename));
+    }
 
     assert(arrangement.has_attribute("is_feature"));
     auto vertex_view = lagrange::vertex_view(arrangement);

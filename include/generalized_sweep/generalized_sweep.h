@@ -104,8 +104,7 @@ struct SweepOptions {
 /// @param grid_spec Specification of the initial 3D spatial grid.
 /// @param options   Options controlling the sweep operation.
 ///
-/// @return          The result of the generalized sweep, including the envelope
-/// mesh,
+/// @return          The result of the generalized sweep, including the envelope mesh,
 ///                  the arrangement mesh, and the final sweep surface.
 ///
 SweepResult generalized_sweep(const SpaceTimeFunction& f,

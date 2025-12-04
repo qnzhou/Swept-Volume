@@ -262,7 +262,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         lagrange::AttributeUsage::Scalar, 1);
     auto time_values = attribute_vector_ref<Scalar>(sweep_arrangement, "time");
     Index count = 0;
-    // TODO: parallalize this loop
+    // TODO: parallelize this loop
     for (size_t fid = 0; fid < num_facets; fid++) {
         auto idx = count++;
         auto parent_fid = parent_facets(fid);

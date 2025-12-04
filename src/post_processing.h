@@ -208,11 +208,11 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
             parent_cell[cid] = parent;
         }
     }
-    auto get_parent = [&](int cid) {
-        while (parent_cell[cid] != cid) {
-            cid = parent_cell[cid];
+    auto get_parent = [&](int cid) -> int {
+        if (parent_cell[cid] != cid) {
+            parent_cell[cid] = get_parent(parent_cell[cid]);
         }
-        return cid;
+        return parent_cell[cid];
     };
 
     // Compute sweep surface facets

@@ -75,6 +75,7 @@ target_link_libraries(adaptive_column_grid
     igl::core
     spdlog::spdlog
     OpenMP::OpenMP_CXX
+    lagrange::core
     )
 
 file(GLOB SWEEP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/app/include/*.h)

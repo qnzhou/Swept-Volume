@@ -418,10 +418,32 @@ int main(int argc, const char *argv[])
     /// End of Mathematica output
 #endif
 
+    // Compute arrangement from envelope
+    auto arrangement_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
     auto sweep_arrangement = compute_envelope_arrangement(envelope);
+    auto arrangement_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Arrangement computation time: "
+        << (arrangement_end - arrangement_start) * 1e-6 << " seconds" << std::endl;
+
+    // Extract sweep surface from arrangement
+    auto extraction_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
     auto sweep_surface = extract_sweep_surface_from_arrangement(sweep_arrangement);
+    auto extraction_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Sweep surface extraction time: "
+        << (extraction_end - extraction_start) * 1e-6 << " seconds" << std::endl;
+
+    // Saving result
     lagrange::io::save_mesh(output_path + "/sweep_surface.msh", sweep_surface);
     lagrange::io::save_mesh(output_path + "/arrangement.msh", sweep_arrangement);
+    save_features(output_path + "/features.obj", sweep_arrangement);
     mtet::save_mesh(output_path + "/tet_grid.msh", grid);
     return 0;
 }

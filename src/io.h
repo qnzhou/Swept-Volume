@@ -47,6 +47,11 @@ void backfill_timeMap_from_labels(
                                   const Eigen::VectorXd& L,
                                   TimeMap& timeMap);
 
+void save_grid_for_mathematica(
+        std::string_view filename,
+        mtet::MTetMesh grid,
+        vertExtrude vertexMap);
+
 template <typename Scalar, typename Index>
 void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Index>& arrangement)
 {

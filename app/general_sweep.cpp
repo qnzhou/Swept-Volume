@@ -228,12 +228,15 @@ int main(int argc, const char *argv[])
     ///
     ///
     ///Grid generation:
+
+    auto grid_gen_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
     vertExtrude vertexMap;
     insidenessMap insideMap;
     std::cout << "Start to generate the background grid..." << std::endl;
     std::array<double, timer_amount> profileTimer{};
     std::array<size_t, timer_amount> profileCount{};
-    auto starterTime = std::chrono::high_resolution_clock::now();
     spdlog::set_level(spdlog::level::off);
     if (!gridRefine(grid, vertexMap, insideMap, implicit_sweep, threshold, traj_threshold, max_splits, insideness_check, profileTimer, profileCount)){
         throw std::runtime_error("ERROR: grid generation failed");
@@ -253,10 +256,18 @@ int main(int argc, const char *argv[])
                             time,
                             values,
                             cyclic);
-    auto stopperTime = std::chrono::high_resolution_clock::now();
-    auto start = std::chrono::time_point_cast<std::chrono::microseconds>(starterTime).time_since_epoch().count();
-    auto grid_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
-    std::cout << "Grid-building time: " << (grid_end - start) * 1e-6 << " seconds" << std::endl;
+
+    auto grid_gen_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Grid generation time: "
+        << (grid_gen_end - grid_gen_start) * 1e-6 << " seconds" << std::endl;
+
+
+    // Extract sillouette set.
+    auto sillouette_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
     std::function<std::span<double>(size_t)> time_func = [&](size_t index)->std::span<double>{
         return time[index];
     };
@@ -272,9 +283,17 @@ int main(int argc, const char *argv[])
     if (!contour.is_manifold()) {
         throw std::runtime_error("ERROR: extracted contour is not manifold");
     }
-    stopperTime = std::chrono::high_resolution_clock::now();
-    auto surface_1_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
-    std::cout << "Surfacing time: " << (surface_1_end - grid_end) * 1e-6 << " seconds (First marching)" << std::endl;
+    auto sillouette_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Sillouette time: "
+        << (sillouette_end - sillouette_start) * 1e-6 << " seconds" << std::endl;
+
+
+    // Evaluate function and gradient at contour vertices
+    auto evaulation_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
     size_t num_contour_vertices = contour.get_num_vertices();
     std::vector<double> function_values(num_contour_vertices);
     std::vector<double> gradient_values(num_contour_vertices * dim);
@@ -287,137 +306,31 @@ int main(int argc, const char *argv[])
         gradient_values[dim * i + 2] = pos_eval.second[2];
         gradient_values[dim * i + 3] = pos_eval.second[3];
     }
+    auto evaulation_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Function evaluation time: "
+        << (evaulation_end - evaulation_start) * 1e-6 << " seconds" << std::endl;
+
     // Extract isocontour
+    auto envelope_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
     auto isocontour = contour.isocontour(function_values, gradient_values, !args.without_snapping);
     if (!isocontour.is_manifold()) {
         std::cout << "isocontour problem" << std::endl;
         throw std::runtime_error("ERROR: extracted isocontour is not manifold");
     }
     isocontour.triangulate_cycles(!args.without_opt_triangulation);
-
-    lagrange::SurfaceMesh<double, uint32_t> envelope;
-    {
-        // Port the isocontour into lagrange mesh
-        size_t num_vertices = isocontour.get_num_vertices();
-        size_t num_cycles= isocontour.get_num_cycles();
-
-        // Add vertices and time
-        envelope.add_vertices(num_vertices);
-        envelope.template create_attribute<double>(
-            "time",
-            lagrange::AttributeElement::Vertex,
-            lagrange::AttributeUsage::Scalar,
-            1
-        );
-        auto time_values = attribute_vector_ref<double>(envelope, "time");
-
-        for (size_t i=0; i<num_vertices; i++) {
-            auto xyzt = isocontour.get_vertex(i);
-            auto pos = envelope.ref_position(i);
-            pos[0] = xyzt[0];
-            pos[1] = xyzt[1];
-            pos[2] = xyzt[2];
-            time_values[i] = xyzt[3];
-        }
-
-        ankerl::unordered_dense::map<std::pair<mtetcol::Index, mtetcol::Index>, std::vector<size_t>> edge_valence_map;
-
-        // Add polygons
-        lagrange::SmallVector<uint32_t, 16> polygon;
-        for (size_t i=0; i<num_cycles; i++) {
-            auto cycle = isocontour.get_cycle(i);
-            size_t cycle_size = cycle.size();
-            polygon.clear();
-            polygon.resize(cycle_size);
-
-            size_t ind = 0;
-            for (auto si : cycle) {
-                mtetcol::Index seg_id = index(si);
-                bool seg_ori = mtetcol::orientation(si);
-                auto seg = isocontour.get_segment(seg_id);
-                polygon[ind] = (seg_ori ? seg[0] : seg[1]);
-                std::pair<mtetcol::Index, mtetcol::Index> edge_key = {
-                    std::min(seg[0], seg[1]),
-                    std::max(seg[0], seg[1])
-                };
-
-                if (edge_valence_map.find(edge_key) == edge_valence_map.end()) {
-                    edge_valence_map[edge_key] = {};
-                }
-                edge_valence_map[edge_key].push_back(i);
-
-                ind ++;
-            }
-            envelope.add_polygon({polygon.data(), polygon.size()});
-        }
-
-        // Add regular attribute
-        envelope.template create_attribute<uint8_t>(
-            "regular",
-            lagrange::AttributeElement::Facet,
-            lagrange::AttributeUsage::Scalar,
-            1
-        );
-        auto regular_values = attribute_vector_ref<uint8_t>(envelope, "regular");
-        for (size_t i=0; i<num_cycles; i++) {
-            regular_values[i] = isocontour.is_cycle_regular(i) ? 1 : 0;
-        }
-    }
-    if (!std::filesystem::exists(output_path)) {
-        // Attempt to create the directory
-        if (std::filesystem::create_directory(output_path)) {
-            std::cout << "Directory created successfully." << std::endl;
-        } else {
-            std::cerr << "Failed to create directory." << std::endl;
-        }
-    } else {
-        std::cout << "Directory already exists. Removing all contents..." << std::endl;
-        for (const auto& entry : std::filesystem::directory_iterator(output_path)) {
-            std::error_code ec;
-            std::filesystem::remove_all(entry.path(), ec);
-            if (ec) {
-                std::cerr << "Error removing " << entry.path() << ": " << ec.message() << std::endl;
-            }
-        }
-    }
-    stopperTime = std::chrono::high_resolution_clock::now();
-    auto surface_2_end = std::chrono::time_point_cast<std::chrono::microseconds>(stopperTime).time_since_epoch().count();
-    std::cout << "Surfacing time: " << (surface_2_end - surface_1_end) * 1e-6 << " seconds (Second marching)" << std::endl;
-
-    lagrange::io::save_mesh(output_path + "/envelope.obj", envelope);
+    lagrange::SurfaceMesh<double, uint32_t> envelope = isocontour_to_mesh<double, uint32_t>(isocontour);
     envelope.initialize_edges();
+    auto envelope_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Envelope time: " 
+        << (envelope_end - envelope_start) * 1e-6 << " seconds" << std::endl;
 
     
-#if SAVE_CONTOUR
-    
-    /// Mathematica isosurfacing output:
-    std::vector<std::array<double, 3>> verts_math;
-    std::vector<std::array<size_t, 4>> simps_math;
-    std::vector<std::vector<double>> time_math;
-    std::vector<std::vector<double>> values_math;
-    convert_4d_grid_col(grid, vertexMap,
-                        verts_math,
-                        simps_math,
-                        time_math,
-                        values_math);
-    std::string column_iso_file = "column_iso.json";
-    {
-        if (std::filesystem::exists(column_iso_file.c_str())){
-            std::filesystem::remove(column_iso_file.c_str());
-        }
-        using json = nlohmann::json;
-        std::ofstream fout(column_iso_file.c_str(),std::ios::app);
-        json jOut;
-        jOut.push_back(json(verts_math));
-        jOut.push_back(json(simps_math));
-        jOut.push_back(json(time_math));
-        jOut.push_back(json(values_math));
-        fout << jOut.dump(4, ' ', true, json::error_handler_t::replace) << std::endl;
-        fout.close();
-    }
-    /// End of Mathematica output
-#endif
-
     // Compute arrangement from envelope
     auto arrangement_start = std::chrono::time_point_cast<std::chrono::microseconds>(
         std::chrono::high_resolution_clock::now()
@@ -441,9 +354,42 @@ int main(int argc, const char *argv[])
         << (extraction_end - extraction_start) * 1e-6 << " seconds" << std::endl;
 
     // Saving result
+    auto saving_start = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+
+    if (!std::filesystem::exists(output_path)) {
+        // Attempt to create the directory
+        if (std::filesystem::create_directory(output_path)) {
+            std::cout << "Directory created successfully." << std::endl;
+        } else {
+            std::cerr << "Failed to create directory." << std::endl;
+        }
+    } else {
+        std::cout << "Directory already exists. Removing all contents..." << std::endl;
+        for (const auto& entry : std::filesystem::directory_iterator(output_path)) {
+            std::error_code ec;
+            std::filesystem::remove_all(entry.path(), ec);
+            if (ec) {
+                std::cerr << "Error removing " << entry.path() << ": " << ec.message() << std::endl;
+            }
+        }
+    }
+
+    lagrange::io::save_mesh(output_path + "/envelope.obj", envelope);
     lagrange::io::save_mesh(output_path + "/sweep_surface.msh", sweep_surface);
     lagrange::io::save_mesh(output_path + "/arrangement.msh", sweep_arrangement);
     save_features(output_path + "/features.obj", sweep_arrangement);
+#if SAVE_CONTOUR
     mtet::save_mesh(output_path + "/tet_grid.msh", grid);
+    save_grid_for_mathematica(output_path + "/contour_iso.json", grid, vertexMap);
+#endif
+
+    auto saving_end = std::chrono::time_point_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now()
+    ).time_since_epoch().count();
+    std::cout << "Saving time: "
+        << (saving_end - saving_start) * 1e-6 << " seconds" << std::endl;
+
     return 0;
 }

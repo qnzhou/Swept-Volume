@@ -276,3 +276,33 @@ void backfill_timeMap_from_labels(
     }
   }
 }
+
+void save_grid_for_mathematica(
+        std::string_view filename,
+        mtet::MTetMesh grid,
+        vertExtrude vertexMap)
+{
+    /// Mathematica isosurfacing output:
+    std::vector<std::array<double, 3>> verts_math;
+    std::vector<std::array<size_t, 4>> simps_math;
+    std::vector<std::vector<double>> time_math;
+    std::vector<std::vector<double>> values_math;
+    convert_4d_grid_col(grid, vertexMap,
+                        verts_math,
+                        simps_math,
+                        time_math,
+                        values_math);
+    {
+        using json = nlohmann::json;
+        std::ofstream fout(filename.data(),std::ios::app);
+        json jOut;
+        jOut.push_back(json(verts_math));
+        jOut.push_back(json(simps_math));
+        jOut.push_back(json(time_math));
+        jOut.push_back(json(values_math));
+        fout << jOut.dump(4, ' ', true, json::error_handler_t::replace) << std::endl;
+        fout.close();
+    }
+    /// End of Mathematica output
+}
+

@@ -16,6 +16,74 @@
 #include <algorithm>
 
 template <typename Scalar, typename Index>
+lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
+    mtetcol::Contour<4>& isocontour) {
+    lagrange::SurfaceMesh<Scalar, Index> envelope;
+
+    // Port the isocontour into lagrange mesh
+    size_t num_vertices = isocontour.get_num_vertices();
+    size_t num_cycles = isocontour.get_num_cycles();
+
+    // Add vertices and time
+    envelope.add_vertices(num_vertices);
+    envelope.template create_attribute<double>(
+        "time", lagrange::AttributeElement::Vertex,
+        lagrange::AttributeUsage::Scalar, 1);
+    auto time_values = attribute_vector_ref<double>(envelope, "time");
+
+    for (size_t i = 0; i < num_vertices; i++) {
+        auto xyzt = isocontour.get_vertex(i);
+        auto pos = envelope.ref_position(i);
+        pos[0] = xyzt[0];
+        pos[1] = xyzt[1];
+        pos[2] = xyzt[2];
+        time_values[i] = xyzt[3];
+    }
+
+    ankerl::unordered_dense::map<std::pair<mtetcol::Index, mtetcol::Index>,
+                                 std::vector<size_t>>
+        edge_valence_map;
+
+    // Add polygons
+    lagrange::SmallVector<uint32_t, 16> polygon;
+    for (size_t i = 0; i < num_cycles; i++) {
+        auto cycle = isocontour.get_cycle(i);
+        size_t cycle_size = cycle.size();
+        polygon.clear();
+        polygon.resize(cycle_size);
+
+        size_t ind = 0;
+        for (auto si : cycle) {
+            mtetcol::Index seg_id = index(si);
+            bool seg_ori = mtetcol::orientation(si);
+            auto seg = isocontour.get_segment(seg_id);
+            polygon[ind] = (seg_ori ? seg[0] : seg[1]);
+            std::pair<mtetcol::Index, mtetcol::Index> edge_key = {
+                std::min(seg[0], seg[1]), std::max(seg[0], seg[1])};
+
+            if (edge_valence_map.find(edge_key) == edge_valence_map.end()) {
+                edge_valence_map[edge_key] = {};
+            }
+            edge_valence_map[edge_key].push_back(i);
+
+            ind++;
+        }
+        envelope.add_polygon({polygon.data(), polygon.size()});
+    }
+
+    // Add regular attribute
+    envelope.template create_attribute<uint8_t>(
+        "regular", lagrange::AttributeElement::Facet,
+        lagrange::AttributeUsage::Scalar, 1);
+    auto regular_values = attribute_vector_ref<uint8_t>(envelope, "regular");
+    for (size_t i = 0; i < num_cycles; i++) {
+        regular_values[i] = isocontour.is_cycle_regular(i) ? 1 : 0;
+    }
+
+    return envelope;
+}
+
+template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     const lagrange::SurfaceMesh<Scalar, Index>& envelope) {
     using Point = Eigen::Matrix<Scalar, 3, 1>;
@@ -68,11 +136,13 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     // Build cell adjacency graph and compute cell volumes
     constexpr Scalar vol_threshold = 1e-5;
     constexpr size_t face_count_threshold = 200;
-    constexpr int32_t invalid_winding_number = std::numeric_limits<int32_t>::max();
+    constexpr int32_t invalid_winding_number =
+        std::numeric_limits<int32_t>::max();
     std::vector<ankerl::unordered_dense::set<Index>> cell_graph(num_cells);
     std::vector<Scalar> cell_volumes(num_cells, 0);
     std::vector<size_t> cell_face_counts(num_cells, 0);
-    std::vector<int32_t> cell_winding_numbers(num_cells, invalid_winding_number);
+    std::vector<int32_t> cell_winding_numbers(num_cells,
+                                              invalid_winding_number);
     for (size_t fid = 0; fid < num_facets; fid++) {
         Index c0 = static_cast<Index>(
             cell_data(patches[fid], 0));  // Cell on the positive side
@@ -86,7 +156,8 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         } else {
             if (cell_winding_numbers[c0] != w0) {
                 // This should never happen
-                throw std::runtime_error("Inconsistent winding numbers detected!");
+                throw std::runtime_error(
+                    "Inconsistent winding numbers detected!");
             }
             assert(cell_winding_numbers[c0] == w0);
         }
@@ -95,7 +166,8 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         } else {
             if (cell_winding_numbers[c1] != w1) {
                 // This should never happen
-                throw std::runtime_error("Inconsistent winding numbers detected!");
+                throw std::runtime_error(
+                    "Inconsistent winding numbers detected!");
             }
             assert(cell_winding_numbers[c1] == w1);
         }
@@ -152,10 +224,12 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     for (size_t fid = 0; fid < num_facets; fid++) {
         int c0 = cell_data(patches[fid], 0);  // Cell on the positive side
         int c1 = cell_data(patches[fid], 1);  // Cell on the negative side
-        c0 = get_parent(c0); // Find the representative parent cell
-        c1 = get_parent(c1); // Find the representative parent cell
-        int w0 = cell_winding_numbers[c0]; // Winding number on the positive side
-        int w1 = cell_winding_numbers[c1]; // Winding number on the negative side
+        c0 = get_parent(c0);  // Find the representative parent cell
+        c1 = get_parent(c1);  // Find the representative parent cell
+        int w0 =
+            cell_winding_numbers[c0];  // Winding number on the positive side
+        int w1 =
+            cell_winding_numbers[c1];  // Winding number on the negative side
 
         if (w0 == 0 && w1 != 0) {
             is_valid[fid] = 1;

@@ -11,6 +11,7 @@
 #include <arrangement/Arrangement.h>
 #include <lagrange/SurfaceMesh.h>
 #include <lagrange/mesh_cleanup/remove_isolated_vertices.h>
+#include <lagrange/utils/SmallVector.h>
 #include <lagrange/views.h>
 
 #include <algorithm>

@@ -1,5 +1,9 @@
+#include "adaptive_column_grid.h"
+#include "col_gridgen.h"
+#include "io.h"
+#include "post_processing.h"
+
 #include <generalized_sweep/generalized_sweep.h>
-#include <lagrange/utils/SmallVector.h>
 #include <mtet/grid.h>
 #include <mtetcol/contour.h>
 #include <mtetcol/simplicial_column.h>
@@ -7,11 +11,6 @@
 #include <array>
 #include <iostream>
 #include <vector>
-
-#include "adaptive_column_grid.h"
-#include "col_gridgen.h"
-#include "io.h"
-#include "post_processing.h"
 
 namespace sweep {
 

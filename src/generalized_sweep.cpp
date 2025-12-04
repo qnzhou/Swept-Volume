@@ -23,7 +23,7 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     vertExtrude vertexMap;
     insidenessMap insideMap;
 
-    // TODO: what is these timers?
+    // TODO: Clarify the purpose of these timers and whether they're still needed.
     std::array<double, timer_amount> profileTimer{};
     std::array<size_t, timer_amount> profileCount{};
     spdlog::set_level(spdlog::level::off);

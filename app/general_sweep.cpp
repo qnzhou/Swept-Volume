@@ -25,7 +25,7 @@
 //#include "post_processing.h"
 //#include "timer.h"
 
-#define SAVE_CONTOUR 1
+#define SAVE_CONTOUR 0
 #define batch_stats 0
 #define batch_time 0
 

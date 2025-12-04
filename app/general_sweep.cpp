@@ -223,7 +223,7 @@ int main(int argc, const char *argv[])
 
 
     // TODO: refactor into a function
-    generalized_sweep::GridSpec grid_spec;
+    sweep::GridSpec grid_spec;
     {
         using json = nlohmann::json;
         std::ifstream fin(args.grid_file.c_str());
@@ -259,14 +259,14 @@ int main(int argc, const char *argv[])
         };
     }
 
-    generalized_sweep::SweepOptions options;
+    sweep::SweepOptions options;
     options.epsilon_env = threshold;
     options.epsilon_sil = traj_threshold;
     options.max_split = max_splits;
     options.with_insideness_check = insideness_check;
     options.with_snapping = !args.without_snapping;
     options.cyclic = args.cyclic;
-    auto result = generalized_sweep::generalized_sweep(implicit_sweep, std::move(grid_spec),
+    auto result = sweep::generalized_sweep(implicit_sweep, std::move(grid_spec),
             std::move(options));
     auto& envelope = result.envelope;
     auto& sweep_surface = result.sweep_surface;

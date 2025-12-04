@@ -7,7 +7,7 @@
 #include <functional>
 #include <limits>
 
-namespace generalized_sweep {
+namespace sweep {
 
 using Scalar = double;
 using Index = uint32_t;
@@ -45,21 +45,23 @@ struct SweepResult {
     /// The (lifted) envelope mesh.
     ///
     /// The spatial coordinates are stored as vertices of the mesh.
-    /// The temporal coordinate is stored as a per-vertex attribute named "time".
+    /// The temporal coordinate is stored as a per-vertex attribute named
+    /// "time".
     lagrange::SurfaceMesh<Scalar, Index> envelope;
 
     /// The spatial arrangement of the envelope.
     ///
-    /// The temporal coordinate is stored as a per-corner attribute named "time".
+    /// The temporal coordinate is stored as a per-corner attribute named
+    /// "time".
     ///
-    /// The per-facet attribute "valid" indicates the set of facets that are part of the final sweep
-    /// surface:
+    /// The per-facet attribute "valid" indicates the set of facets that are
+    /// part of the final sweep surface:
     ///   - 0: the facet is not part of the sweep surface
     ///   - 1: the facet is part of the sweep surface with original orientation
     ///   - -1: the facet is part of the sweep surface with flipped orientation
     ///
-    /// The per-edge attribute "is_feature" indicates which edge is part of feature curves on the
-    /// sweep surface.
+    /// The per-edge attribute "is_feature" indicates which edge is part of
+    /// feature curves on the sweep surface.
     lagrange::SurfaceMesh<Scalar, Index> arrangement;
 
     /// The final sweep surface mesh extracted from the arrangement.
@@ -82,8 +84,8 @@ struct SweepOptions {
     int max_split = std::numeric_limits<int>::max();
 
     /// Whether to perform insideness checks during grid refinement.
-    /// If true, the algorithm will stop refinement early once it detects a cell is inside of the
-    /// swept volume.
+    /// If true, the algorithm will stop refinement early once it detects a cell
+    /// is inside of the swept volume.
     bool with_insideness_check = true;
 
     /// Whether to enable vertex snapping during isocontouring.
@@ -102,11 +104,12 @@ struct SweepOptions {
 /// @param grid_spec Specification of the initial 3D spatial grid.
 /// @param options   Options controlling the sweep operation.
 ///
-/// @return          The result of the generalized sweep, including the envelope mesh,
+/// @return          The result of the generalized sweep, including the envelope
+/// mesh,
 ///                  the arrangement mesh, and the final sweep surface.
 ///
 SweepResult generalized_sweep(const SpaceTimeFunction& f,
                               GridSpec grid_spec = {},
                               SweepOptions options = {});
 
-};  // namespace generalized_sweep
+};  // namespace sweep

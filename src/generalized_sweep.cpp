@@ -13,7 +13,7 @@
 #include "io.h"
 #include "post_processing.h"
 
-namespace generalized_sweep {
+namespace sweep {
 
 std::tuple<std::vector<Scalar>, std::vector<Index>,
            std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
@@ -116,4 +116,4 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
     return result;
 }
 
-}  // namespace generalized_sweep
+}  // namespace sweep

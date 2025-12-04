@@ -200,7 +200,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
             int parent = parent_cell[cid];
             Scalar max_vol = std::abs(cell_volumes[cid]);
             for (auto adj_cid : cell_graph[cid]) {
-                if (cell_volumes[adj_cid] > max_vol) {
+                if (std::abs(cell_volumes[adj_cid]) > max_vol) {
                     max_vol = std::abs(cell_volumes[adj_cid]);
                     parent = adj_cid;
                 }

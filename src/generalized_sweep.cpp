@@ -1,8 +1,8 @@
 #include <generalized_sweep/generalized_sweep.h>
+#include <lagrange/utils/SmallVector.h>
 #include <mtet/grid.h>
 #include <mtetcol/contour.h>
 #include <mtetcol/simplicial_column.h>
-#include <lagrange/utils/SmallVector.h>
 
 #include <array>
 #include <iostream>
@@ -15,9 +15,10 @@
 
 namespace generalized_sweep {
 
-mtetcol::SimplicialColumn<4> refine_grid(const SpaceTimeFunction& f,
-                                         mtet::MTetMesh& grid,
-                                         const SweepOptions& options) {
+std::tuple<std::vector<Scalar>, std::vector<Index>,
+           std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
+refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
+            const SweepOptions& options) {
     std::cout << "Start to generate the background grid..." << std::endl;
 
     vertExtrude vertexMap;
@@ -35,7 +36,6 @@ mtetcol::SimplicialColumn<4> refine_grid(const SpaceTimeFunction& f,
     };
     spdlog::set_level(spdlog::level::info);
 
-    Scalar iso_value = 0.0;
     bool cyclic = options.cyclic;
     std::vector<mtetcol::Scalar> verts;
     std::vector<mtetcol::Index> simps;
@@ -44,16 +44,7 @@ mtetcol::SimplicialColumn<4> refine_grid(const SpaceTimeFunction& f,
     convert_4d_grid_mtetcol(grid, vertexMap, verts, simps, time, values,
                             cyclic);
 
-    std::function<std::span<double>(size_t)> time_func =
-        [&](size_t index) -> std::span<double> { return time[index]; };
-    std::function<std::span<double>(size_t)> values_func =
-        [&](size_t index) -> std::span<double> { return values[index]; };
-    mtetcol::SimplicialColumn<4> columns;
-    columns.set_vertices(verts);
-    columns.set_simplices(simps);
-    columns.set_time_samples(time_func, values_func);
-
-    return columns;
+    return {verts, simps, time, values};
 }
 
 lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
@@ -63,10 +54,9 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
     size_t num_contour_vertices = contour.get_num_vertices();
     std::vector<double> function_values(num_contour_vertices);
     std::vector<double> gradient_values(num_contour_vertices * dim);
-    for (uint32_t i = 0; i < num_contour_vertices; ++i) {
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
         auto pos = contour.get_vertex(i);
-        auto pos_eval =
-            f(Eigen::RowVector4d{pos[0], pos[1], pos[2], pos[3]});
+        auto pos_eval = f(Eigen::RowVector4d{pos[0], pos[1], pos[2], pos[3]});
         function_values[i] = pos_eval.first;
         gradient_values[dim * i] = pos_eval.second[0];
         gradient_values[dim * i + 1] = pos_eval.second[1];
@@ -76,11 +66,14 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
 
     // Extract isocontour
     auto isocontour = contour.isocontour(function_values, gradient_values,
-            options.with_snapping);
+                                         options.with_snapping);
     if (!isocontour.is_manifold()) {
         throw std::runtime_error("ERROR: extracted isocontour is not manifold");
     }
-    isocontour.triangulate_cycles();
+    if (isocontour.get_num_cycles() == 0) {
+        throw std::runtime_error("ERROR: extracted isocontour has zero cycles");
+    }
+    isocontour.triangulate_cycles(true);
     lagrange::SurfaceMesh<Scalar, Index> envelope =
         isocontour_to_mesh<Scalar, Index>(isocontour);
     envelope.initialize_edges();
@@ -93,10 +86,22 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
     SweepResult result;
     auto grid = mtet::generate_tet_grid(grid_spec.resolution,
                                         grid_spec.bbox_min, grid_spec.bbox_max);
+    // TODO: investigate why saving and loading is necessary here???
+    mtet::save_mesh("init.msh", grid);
+    grid = mtet::load_mesh("init.msh");
 
-    auto columns = refine_grid(f, grid, options);
+    auto [verts, simps, time, values] = refine_grid(f, grid, options);
+    std::function<std::span<double>(size_t)> time_func =
+        [&](size_t index) -> std::span<double> { return time[index]; };
+    std::function<std::span<double>(size_t)> values_func =
+        [&](size_t index) -> std::span<double> { return values[index]; };
+    mtetcol::SimplicialColumn<4> columns;
+    columns.set_vertices(verts);
+    columns.set_simplices(simps);
+    columns.set_time_samples(time_func, values_func);
 
-    auto contour = columns.extract_contour(options.isovalue, options.cyclic);
+    constexpr Scalar iso_value = 0.0;
+    auto contour = columns.extract_contour(iso_value, options.cyclic);
     if (!contour.is_manifold()) {
         throw std::runtime_error("ERROR: extracted contour is not manifold");
     }
@@ -105,7 +110,8 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
 
     result.arrangement = compute_envelope_arrangement(result.envelope);
 
-    result.sweep_surface = extract_sweep_surface_from_arrangement(result.arrangement);
+    result.sweep_surface =
+        extract_sweep_surface_from_arrangement(result.arrangement);
 
     return result;
 }

@@ -21,6 +21,8 @@
 #include <lagrange/topology.h>
 #include <lagrange/utils/SmallVector.h>
 
+#include <generalized_sweep/generalized_sweep.h>
+
 
 #include "init_grid.h"
 #include "io.h"
@@ -63,15 +65,8 @@ int main(int argc, const char *argv[])
                  "Disable optimal triangulation in iso-surfacing triangulation step");
     app.add_flag("--cyclic", args.cyclic, "Whether the trajectory is cyclic or not");
     CLI11_PARSE(app, argc, argv);
-    // Read initial grid
-    mtet::MTetMesh grid;
-    if (args.grid_file.find(".json") != std::string::npos){
-        grid = init_grid::load_tet_mesh(args.grid_file);
-        mtet::save_mesh("init.msh", grid);
-        grid = mtet::load_mesh("init.msh");
-    } else {
-        grid = mtet::load_mesh(args.grid_file);
-    }
+
+
     std::string output_path = args.output_path;
     int max_splits = args.max_splits;
     bool insideness_check = !args.without_insideness_check;
@@ -225,133 +220,58 @@ int main(int argc, const char *argv[])
             return flippingDonutFullTurn(data);
         };
     }
-    ///
-    ///
-    ///Grid generation:
-
-    auto grid_gen_start = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    vertExtrude vertexMap;
-    insidenessMap insideMap;
-    std::cout << "Start to generate the background grid..." << std::endl;
-    std::array<double, timer_amount> profileTimer{};
-    std::array<size_t, timer_amount> profileCount{};
-    spdlog::set_level(spdlog::level::off);
-    if (!gridRefine(grid, vertexMap, insideMap, implicit_sweep, threshold, traj_threshold, max_splits, insideness_check, profileTimer, profileCount)){
-        throw std::runtime_error("ERROR: grid generation failed");
-        return 0;
-    };
-    spdlog::set_level(spdlog::level::info);
-    
-    Scalar iso_value = 0.0;
-    bool cyclic = args.cyclic;
-    std::vector<mtetcol::Scalar> verts;
-    std::vector<mtetcol::Index> simps;
-    std::vector<std::vector<double>> time;
-    std::vector<std::vector<double>> values;
-    convert_4d_grid_mtetcol(grid, vertexMap,
-                            verts,
-                            simps,
-                            time,
-                            values,
-                            cyclic);
-
-    auto grid_gen_end = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::cout << "Grid generation time: "
-        << (grid_gen_end - grid_gen_start) * 1e-6 << " seconds" << std::endl;
 
 
-    // Extract sillouette set.
-    auto sillouette_start = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::function<std::span<double>(size_t)> time_func = [&](size_t index)->std::span<double>{
-        return time[index];
-    };
-    std::function<std::span<double>(size_t)> values_func = [&](size_t index)->std::span<double>{
-        return values[index];
-    };
-    mtetcol::SimplicialColumn<dim> columns;
-    columns.set_vertices(verts);
-    columns.set_simplices(simps);
-    columns.set_time_samples(time_func, values_func);
-    
-    auto contour = columns.extract_contour(iso_value, cyclic);
-    if (!contour.is_manifold()) {
-        throw std::runtime_error("ERROR: extracted contour is not manifold");
+    // TODO: refactor into a function
+    generalized_sweep::GridSpec grid_spec;
+    {
+        using json = nlohmann::json;
+        std::ifstream fin(args.grid_file.c_str());
+        if (!fin) {
+            throw std::runtime_error("tet mesh file not exist!");
+        }
+        json data;
+        fin >> data;
+        fin.close();
+        if (!data.contains("resolution") || !data.contains("bbox_min") || !data.contains("bbox_max")) {
+            throw std::runtime_error("grid specification missing in json file!");
+        }
+        if (data["resolution"].size() == 3) {
+            grid_spec.resolution = {
+                data["resolution"][0].get<size_t>(),
+                data["resolution"][1].get<size_t>(),
+                data["resolution"][2].get<size_t>()
+            };
+        } else {
+            assert(data["resolution"].size() == 1);
+            size_t res = data["resolution"][0].get<size_t>();
+            grid_spec.resolution = {res, res, res};
+        }
+        grid_spec.bbox_min = {
+            data["bbox_min"][0].get<float>(),
+            data["bbox_min"][1].get<float>(),
+            data["bbox_min"][2].get<float>()
+        };
+        grid_spec.bbox_max = {
+            data["bbox_max"][0].get<float>(),
+            data["bbox_max"][1].get<float>(),
+            data["bbox_max"][2].get<float>()
+        };
     }
-    auto sillouette_end = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::cout << "Sillouette time: "
-        << (sillouette_end - sillouette_start) * 1e-6 << " seconds" << std::endl;
 
+    generalized_sweep::SweepOptions options;
+    options.epsilon_env = threshold;
+    options.epsilon_sil = traj_threshold;
+    options.max_split = max_splits;
+    options.with_insideness_check = insideness_check;
+    options.with_snapping = !args.without_snapping;
+    options.cyclic = args.cyclic;
+    auto result = generalized_sweep::generalized_sweep(implicit_sweep, std::move(grid_spec),
+            std::move(options));
+    auto& envelope = result.envelope;
+    auto& sweep_surface = result.sweep_surface;
+    auto& sweep_arrangement = result.arrangement;
 
-    // Evaluate function and gradient at contour vertices
-    auto evaulation_start = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    size_t num_contour_vertices = contour.get_num_vertices();
-    std::vector<double> function_values(num_contour_vertices);
-    std::vector<double> gradient_values(num_contour_vertices * dim);
-    for (uint32_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        auto pos_eval = implicit_sweep(Eigen::RowVector4d{pos[0], pos[1], pos[2], pos[3]});
-        function_values[i] = pos_eval.first;
-        gradient_values[dim * i] = pos_eval.second[0];
-        gradient_values[dim * i + 1] = pos_eval.second[1];
-        gradient_values[dim * i + 2] = pos_eval.second[2];
-        gradient_values[dim * i + 3] = pos_eval.second[3];
-    }
-    auto evaulation_end = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::cout << "Function evaluation time: "
-        << (evaulation_end - evaulation_start) * 1e-6 << " seconds" << std::endl;
-
-    // Extract isocontour
-    auto envelope_start = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    auto isocontour = contour.isocontour(function_values, gradient_values, !args.without_snapping);
-    if (!isocontour.is_manifold()) {
-        std::cout << "isocontour problem" << std::endl;
-        throw std::runtime_error("ERROR: extracted isocontour is not manifold");
-    }
-    isocontour.triangulate_cycles(!args.without_opt_triangulation);
-    lagrange::SurfaceMesh<double, uint32_t> envelope = isocontour_to_mesh<double, uint32_t>(isocontour);
-    envelope.initialize_edges();
-    auto envelope_end = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::cout << "Envelope time: " 
-        << (envelope_end - envelope_start) * 1e-6 << " seconds" << std::endl;
-
-    
-    // Compute arrangement from envelope
-    auto arrangement_start = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    auto sweep_arrangement = compute_envelope_arrangement(envelope);
-    auto arrangement_end = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::cout << "Arrangement computation time: "
-        << (arrangement_end - arrangement_start) * 1e-6 << " seconds" << std::endl;
-
-    // Extract sweep surface from arrangement
-    auto extraction_start = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    auto sweep_surface = extract_sweep_surface_from_arrangement(sweep_arrangement);
-    auto extraction_end = std::chrono::time_point_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now()
-    ).time_since_epoch().count();
-    std::cout << "Sweep surface extraction time: "
-        << (extraction_end - extraction_start) * 1e-6 << " seconds" << std::endl;
 
     // Saving result
     auto saving_start = std::chrono::time_point_cast<std::chrono::microseconds>(
@@ -376,13 +296,13 @@ int main(int argc, const char *argv[])
         }
     }
 
-    lagrange::io::save_mesh(output_path + "/envelope.obj", envelope);
+    lagrange::io::save_mesh(output_path + "/envelope.msh", envelope);
     lagrange::io::save_mesh(output_path + "/sweep_surface.msh", sweep_surface);
     lagrange::io::save_mesh(output_path + "/arrangement.msh", sweep_arrangement);
     save_features(output_path + "/features.obj", sweep_arrangement);
 #if SAVE_CONTOUR
-    mtet::save_mesh(output_path + "/tet_grid.msh", grid);
-    save_grid_for_mathematica(output_path + "/contour_iso.json", grid, vertexMap);
+    //mtet::save_mesh(output_path + "/tet_grid.msh", grid);
+    //save_grid_for_mathematica(output_path + "/contour_iso.json", grid, vertexMap);
 #endif
 
     auto saving_end = std::chrono::time_point_cast<std::chrono::microseconds>(

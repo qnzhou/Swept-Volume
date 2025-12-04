@@ -19,6 +19,8 @@
 
 #include "MeshSDF.h"
 
+using Scalar = double;
+
 void trajLine3D(double t, Eigen::RowVector3d& xt, Eigen::RowVector3d& vt) {
     // Define the fixed vectors
     Eigen::RowVector3d start(0.01, 0.01, 0.0);

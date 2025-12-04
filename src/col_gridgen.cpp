@@ -9,7 +9,7 @@
 
 #include "col_gridgen.h"
 
-namespace dr = drjit; // For nanothread
+//namespace dr = drjit; // For nanothread
 #define MIN_EDGE_LEN 1e-5
 #define parallel_bezier 0
 

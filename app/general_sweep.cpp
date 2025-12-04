@@ -2,15 +2,9 @@
 #include <queue>
 #include <optional>
 #include <CLI/CLI.hpp>
-#include <mtet/io.h>
 #include <chrono>
 #include <igl/read_triangle_mesh.h>
 #include <igl/signed_distance.h>
-#include <mtetcol/contour.h>
-#include <mtetcol/simplicial_column.h>
-#include <mtetcol/io.h>
-#include <igl/write_triangle_mesh.h>
-#include <igl/remove_unreferenced.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
@@ -24,16 +18,40 @@
 #include <generalized_sweep/generalized_sweep.h>
 
 
-#include "init_grid.h"
-#include "io.h"
-#include "col_gridgen.h"
+//#include "init_grid.h"
+//#include "io.h"
+//#include "col_gridgen.h"
 #include "trajectory.h"
-#include "post_processing.h"
-#include "timer.h"
+//#include "post_processing.h"
+//#include "timer.h"
 
 #define SAVE_CONTOUR 1
 #define batch_stats 0
 #define batch_time 0
+
+template <typename Scalar, typename Index>
+void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Index>& arrangement)
+{
+    std::ofstream fout(filename.data());
+
+    assert(arrangement.has_attribute("is_feature"));
+    auto vertex_view = lagrange::vertex_view(arrangement);
+    Index num_vertices = arrangement.get_num_vertices();
+    for (Index vid=0; vid < num_vertices; vid++) {
+        fout << "v " << vertex_view(vid,0) << " "
+             << vertex_view(vid,1) << " "
+             << vertex_view(vid,2) << std::endl;
+    }
+
+    auto is_feature = lagrange::attribute_vector_view<int8_t>(arrangement, "is_feature");
+    Index num_edges = arrangement.get_num_edges();
+    for (Index eid=0; eid < num_edges; eid++) {
+        if (is_feature(eid)) {
+            auto [v0, v1] = arrangement.get_edge_vertices(eid);
+            fout << "l "<< (v0 + 1) << " " << (v1 + 1) << std::endl;
+        }
+    }
+}
 
 int main(int argc, const char *argv[])
 {
@@ -65,6 +83,8 @@ int main(int argc, const char *argv[])
                  "Disable optimal triangulation in iso-surfacing triangulation step");
     app.add_flag("--cyclic", args.cyclic, "Whether the trajectory is cyclic or not");
     CLI11_PARSE(app, argc, argv);
+
+    using Scalar = sweep::Scalar;
 
 
     std::string output_path = args.output_path;

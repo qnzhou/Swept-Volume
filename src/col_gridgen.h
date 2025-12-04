@@ -7,7 +7,6 @@
 
 #ifndef col_gridgen_h
 #define col_gridgen_h
-#include <nanothread/nanothread.h>
 #include <iostream>
 #include <mtetcol/simplicial_column.h>
 #include "adaptive_column_grid.h"

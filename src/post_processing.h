@@ -126,12 +126,12 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
                     facets.data());
     }
     sweep_arrangement.template create_attribute<Index>(
-        "envelop_facet_id", lagrange::AttributeElement::Facet,
+        "envelope_facet_id", lagrange::AttributeElement::Facet,
         lagrange::AttributeUsage::Scalar, 1);
-    auto envelop_facet_id =
-        attribute_vector_ref<Index>(sweep_arrangement, "envelop_facet_id");
+    auto envelope_facet_id =
+        attribute_vector_ref<Index>(sweep_arrangement, "envelope_facet_id");
     std::copy_n(parent_facets.data(), parent_facets.size(),
-                envelop_facet_id.data());
+                envelope_facet_id.data());
     sweep_arrangement.initialize_edges();
 
     // Build cell adjacency graph and compute cell volumes

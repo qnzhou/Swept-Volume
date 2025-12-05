@@ -8,8 +8,8 @@
 
 #include <array>
 #include <chrono>
-#include <iostream>
 #include <vector>
+#include <filesystem>
 
 #include "adaptive_column_grid.h"
 #include "col_gridgen.h"
@@ -30,6 +30,7 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid, const SweepOptions
     // TODO: investigate why saving and loading is necessary here???
     mtet::save_mesh("init.msh", grid);
     grid = mtet::load_mesh("init.msh");
+    std::filesystem::remove("init.msh");
 
     vertExtrude vertexMap;
     insidenessMap insideMap;

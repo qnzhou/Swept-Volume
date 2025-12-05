@@ -1,8 +1,9 @@
-#include <sweep/generalized_sweep.h>
-#include <sweep/logger.h>
+#include <ankerl/unordered_dense.h>
 #include <mtet/grid.h>
 #include <mtetcol/contour.h>
 #include <mtetcol/simplicial_column.h>
+#include <sweep/generalized_sweep.h>
+#include <sweep/logger.h>
 
 #include <array>
 #include <chrono>
@@ -21,6 +22,10 @@ std::tuple<std::vector<Scalar>, std::vector<Index>,
 refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
             const SweepOptions& options) {
     logger().info("Start to generate the background grid...");
+
+    // TODO: investigate why saving and loading is necessary here???
+    mtet::save_mesh("init.msh", grid);
+    grid = mtet::load_mesh("init.msh");
 
     vertExtrude vertexMap;
     insidenessMap insideMap;
@@ -46,6 +51,60 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     convert_4d_grid_mtetcol(grid, vertexMap, verts, simps, time, values,
                             cyclic);
 
+    return {verts, simps, time, values};
+}
+
+std::tuple<std::vector<Scalar>, std::vector<Index>,
+           std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
+evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
+              const SweepOptions& options) {
+    size_t num_vertices = grid.get_num_vertices();
+    size_t num_tets = grid.get_num_tets();
+
+    std::vector<mtetcol::Scalar> verts(num_vertices * 3);
+    std::vector<mtetcol::Index> simps(num_tets * 4);
+    std::vector<std::vector<double>> time;
+    std::vector<std::vector<double>> values;
+
+    time.reserve(num_vertices * options.initial_time_samples);
+    values.reserve(num_vertices * options.initial_time_samples);
+
+    // Extract vertices
+    ankerl::unordered_dense::map<uint64_t, Index> vertex_map;
+    vertex_map.reserve(num_vertices);
+    grid.seq_foreach_vertex(
+        [&](mtet::VertexId vid, std::span<const mtet::Scalar, 3> pos) {
+            Index idx = static_cast<Index>(vertex_map.size());
+            vertex_map[value_of(vid)] = idx;
+            verts[idx * 3 + 0] = static_cast<mtetcol::Scalar>(pos[0]);
+            verts[idx * 3 + 1] = static_cast<mtetcol::Scalar>(pos[1]);
+            verts[idx * 3 + 2] = static_cast<mtetcol::Scalar>(pos[2]);
+        });
+
+    // Extract tets
+    size_t tet_count = 0;
+    grid.seq_foreach_tet([&](mtet::TetId tid,
+                             std::span<const mtet::VertexId, 4> tet_verts) {
+        for (size_t i = 0; i < 4; ++i) {
+            simps[tet_count * 4 + i] =
+                static_cast<mtetcol::Index>(vertex_map[value_of(tet_verts[i])]);
+        }
+        tet_count++;
+    });
+
+    // Extract time and time derivative
+    for (size_t vid = 0; vid < num_vertices; vid++) {
+        for (size_t tid = 0; tid < options.initial_time_samples; tid++) {
+            double t =
+                static_cast<double>(tid) / (options.initial_time_samples - 1);
+            Eigen::RowVector4d eval_point;
+            eval_point << verts[vid * 3 + 0], verts[vid * 3 + 1],
+                verts[vid * 3 + 2], t;
+            auto eval = f(eval_point);
+            time[vid].push_back(t);
+            values[vid].push_back(eval.second[3]);  // Value is time derivative.
+        }
+    }
     return {verts, simps, time, values};
 }
 
@@ -94,16 +153,27 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
         "Initial grid generation time: {} seconds",
         std::chrono::duration<double>(init_grid_end - init_grid_start).count());
 
-    // TODO: investigate why saving and loading is necessary here???
-    mtet::save_mesh("init.msh", grid);
-    grid = mtet::load_mesh("init.msh");
+    std::vector<mtetcol::Scalar> verts;
+    std::vector<mtetcol::Index> simps;
+    std::vector<std::vector<double>> time;
+    std::vector<std::vector<double>> values;
 
-    auto refine_start = std::chrono::high_resolution_clock::now();
-    auto [verts, simps, time, values] = refine_grid(f, grid, options);
-    auto refine_end = std::chrono::high_resolution_clock::now();
-    logger().info(
-        "Grid refinement time: {} seconds",
-        std::chrono::duration<double>(refine_end - refine_start).count());
+    if (options.with_adaptive_refinement) {
+        auto refine_start = std::chrono::high_resolution_clock::now();
+        std::tie(verts, simps, time, values) = refine_grid(f, grid, options);
+        auto refine_end = std::chrono::high_resolution_clock::now();
+        logger().info(
+            "Grid refinement time: {} seconds",
+            std::chrono::duration<double>(refine_end - refine_start).count());
+    } else {
+        auto evaluate_start = std::chrono::high_resolution_clock::now();
+        std::tie(verts, simps, time, values) = evaluate_grid(f, grid, options);
+        auto evaluate_end = std::chrono::high_resolution_clock::now();
+        logger().info(
+            "Grid evaluation time: {} seconds",
+            std::chrono::duration<double>(evaluate_end - evaluate_start)
+                .count());
+    }
 
     std::function<std::span<double>(size_t)> time_func =
         [&](size_t index) -> std::span<double> { return time[index]; };

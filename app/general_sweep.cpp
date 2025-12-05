@@ -30,6 +30,48 @@
 #define batch_stats 0
 #define batch_time 0
 
+sweep::GridSpec load_grid_spec(const std::string& grid_file)
+{
+    sweep::GridSpec grid_spec;
+
+    using json = nlohmann::json;
+    std::ifstream fin(grid_file.c_str());
+    if (!fin) {
+        throw std::runtime_error("Grid file does not exist!");
+    }
+    json data;
+    fin >> data;
+    fin.close();
+    if (!data.contains("resolution") || !data.contains("bbox_min") || !data.contains("bbox_max")) {
+        throw std::runtime_error("grid specification missing in json file!");
+    }
+    if (data["resolution"].size() == 3) {
+        grid_spec.resolution = {
+            data["resolution"][0].get<size_t>(),
+            data["resolution"][1].get<size_t>(),
+            data["resolution"][2].get<size_t>()
+        };
+    } else {
+        if (data["resolution"].size() != 1) {
+            throw std::runtime_error("resolution should have size 1 or 3!");
+        }
+        size_t res = data["resolution"][0].get<size_t>();
+        grid_spec.resolution = {res, res, res};
+    }
+    grid_spec.bbox_min = {
+        data["bbox_min"][0].get<float>(),
+        data["bbox_min"][1].get<float>(),
+        data["bbox_min"][2].get<float>()
+    };
+    grid_spec.bbox_max = {
+        data["bbox_max"][0].get<float>(),
+        data["bbox_max"][1].get<float>(),
+        data["bbox_max"][2].get<float>()
+    };
+
+    return grid_spec;
+}
+
 template <typename Scalar, typename Index>
 void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Index>& arrangement)
 {
@@ -248,44 +290,7 @@ int main(int argc, const char *argv[])
     }
 
 
-    // TODO: refactor into a function
-    sweep::GridSpec grid_spec;
-    {
-        using json = nlohmann::json;
-        std::ifstream fin(args.grid_file.c_str());
-        if (!fin) {
-            throw std::runtime_error("Grid file does not exist!");
-        }
-        json data;
-        fin >> data;
-        fin.close();
-        if (!data.contains("resolution") || !data.contains("bbox_min") || !data.contains("bbox_max")) {
-            throw std::runtime_error("grid specification missing in json file!");
-        }
-        if (data["resolution"].size() == 3) {
-            grid_spec.resolution = {
-                data["resolution"][0].get<size_t>(),
-                data["resolution"][1].get<size_t>(),
-                data["resolution"][2].get<size_t>()
-            };
-        } else {
-            if (data["resolution"].size() != 1) {
-                throw std::runtime_error("resolution should have size 1 or 3!");
-            }
-            size_t res = data["resolution"][0].get<size_t>();
-            grid_spec.resolution = {res, res, res};
-        }
-        grid_spec.bbox_min = {
-            data["bbox_min"][0].get<float>(),
-            data["bbox_min"][1].get<float>(),
-            data["bbox_min"][2].get<float>()
-        };
-        grid_spec.bbox_max = {
-            data["bbox_max"][0].get<float>(),
-            data["bbox_max"][1].get<float>(),
-            data["bbox_max"][2].get<float>()
-        };
-    }
+    sweep::GridSpec grid_spec = load_grid_spec(args.grid_file);
 
     sweep::SweepOptions options;
     options.epsilon_env = threshold;

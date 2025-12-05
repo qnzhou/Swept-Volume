@@ -107,6 +107,12 @@ struct SweepOptions {
     /// Filtered arrangement cells will be merged into adjacent cells during the sweep surface
     /// extraction step.
     size_t face_count_threshold = 200;
+
+    /// Adaptively refine the input grid based on the implicit function.
+    bool with_adaptive_refinement = true;
+
+    /// Number of initial uniform time samples per spatial grid vertex.
+    bool initial_time_samples = 8;
 };
 
 ///

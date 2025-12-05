@@ -30,7 +30,8 @@
 #define batch_stats 0
 #define batch_time 0
 
-sweep::GridSpec load_grid_spec(const std::string& grid_file) {
+sweep::GridSpec load_grid_spec(const std::string& grid_file)
+{
     sweep::GridSpec grid_spec;
 
     using json = nlohmann::json;
@@ -41,14 +42,14 @@ sweep::GridSpec load_grid_spec(const std::string& grid_file) {
     json data;
     fin >> data;
     fin.close();
-    if (!data.contains("resolution") || !data.contains("bbox_min") ||
-        !data.contains("bbox_max")) {
+    if (!data.contains("resolution") || !data.contains("bbox_min") || !data.contains("bbox_max")) {
         throw std::runtime_error("grid specification missing in json file!");
     }
     if (data["resolution"].size() == 3) {
-        grid_spec.resolution = {data["resolution"][0].get<size_t>(),
-                                data["resolution"][1].get<size_t>(),
-                                data["resolution"][2].get<size_t>()};
+        grid_spec.resolution = {
+            data["resolution"][0].get<size_t>(),
+            data["resolution"][1].get<size_t>(),
+            data["resolution"][2].get<size_t>()};
     } else {
         if (data["resolution"].size() != 1) {
             throw std::runtime_error("resolution should have size 1 or 3!");
@@ -56,28 +57,28 @@ sweep::GridSpec load_grid_spec(const std::string& grid_file) {
         size_t res = data["resolution"][0].get<size_t>();
         grid_spec.resolution = {res, res, res};
     }
-    grid_spec.bbox_min = {data["bbox_min"][0].get<float>(),
-                          data["bbox_min"][1].get<float>(),
-                          data["bbox_min"][2].get<float>()};
-    grid_spec.bbox_max = {data["bbox_max"][0].get<float>(),
-                          data["bbox_max"][1].get<float>(),
-                          data["bbox_max"][2].get<float>()};
+    grid_spec.bbox_min = {
+        data["bbox_min"][0].get<float>(),
+        data["bbox_min"][1].get<float>(),
+        data["bbox_min"][2].get<float>()};
+    grid_spec.bbox_max = {
+        data["bbox_max"][0].get<float>(),
+        data["bbox_max"][1].get<float>(),
+        data["bbox_max"][2].get<float>()};
 
     return grid_spec;
 }
 
 template <typename Scalar, typename Index>
-void save_features(std::string_view filename,
-                   lagrange::SurfaceMesh<Scalar, Index>& arrangement) {
+void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Index>& arrangement)
+{
     std::ofstream fout(filename.data());
     if (!fout) {
-        throw std::runtime_error("Failed to open file: " +
-                                 std::string(filename));
+        throw std::runtime_error("Failed to open file: " + std::string(filename));
     }
 
     if (!arrangement.has_attribute("is_feature")) {
-        throw std::runtime_error(
-            "Arrangement mesh does not have 'is_feature' attribute.");
+        throw std::runtime_error("Arrangement mesh does not have 'is_feature' attribute.");
     }
     auto vertex_view = lagrange::vertex_view(arrangement);
     Index num_vertices = arrangement.get_num_vertices();
@@ -86,8 +87,7 @@ void save_features(std::string_view filename,
              << vertex_view(vid, 2) << std::endl;
     }
 
-    auto is_feature =
-        lagrange::attribute_vector_view<int8_t>(arrangement, "is_feature");
+    auto is_feature = lagrange::attribute_vector_view<int8_t>(arrangement, "is_feature");
     Index num_edges = arrangement.get_num_edges();
     for (Index eid = 0; eid < num_edges; eid++) {
         if (is_feature(eid)) {
@@ -97,13 +97,11 @@ void save_features(std::string_view filename,
     }
 }
 
-void load_config(std::string config_file, sweep::GridSpec& grid_spec,
-                 sweep::SweepOptions& options) {
+void load_config(std::string config_file, sweep::GridSpec& grid_spec, sweep::SweepOptions& options)
+{
     std::filesystem::path config_path(config_file);
-    if (!std::filesystem::exists(config_path) ||
-        !std::filesystem::is_regular_file(config_path)) {
-        sweep::logger().warn("Configuration file does not exist: {}",
-                             config_file);
+    if (!std::filesystem::exists(config_path) || !std::filesystem::is_regular_file(config_path)) {
+        sweep::logger().warn("Configuration file does not exist: {}", config_file);
         return;
     }
 
@@ -111,19 +109,22 @@ void load_config(std::string config_file, sweep::GridSpec& grid_spec,
     if (config["grid"]) {
         auto grid_config = config["grid"];
         if (grid_config["resolution"]) {
-            grid_spec.resolution = {grid_config["resolution"][0].as<size_t>(),
-                                    grid_config["resolution"][1].as<size_t>(),
-                                    grid_config["resolution"][2].as<size_t>()};
+            grid_spec.resolution = {
+                grid_config["resolution"][0].as<size_t>(),
+                grid_config["resolution"][1].as<size_t>(),
+                grid_config["resolution"][2].as<size_t>()};
         }
         if (grid_config["bbox_min"]) {
-            grid_spec.bbox_min = {grid_config["bbox_min"][0].as<float>(),
-                                  grid_config["bbox_min"][1].as<float>(),
-                                  grid_config["bbox_min"][2].as<float>()};
+            grid_spec.bbox_min = {
+                grid_config["bbox_min"][0].as<float>(),
+                grid_config["bbox_min"][1].as<float>(),
+                grid_config["bbox_min"][2].as<float>()};
         }
         if (grid_config["bbox_max"]) {
-            grid_spec.bbox_max = {grid_config["bbox_max"][0].as<float>(),
-                                  grid_config["bbox_max"][1].as<float>(),
-                                  grid_config["bbox_max"][2].as<float>()};
+            grid_spec.bbox_max = {
+                grid_config["bbox_max"][0].as<float>(),
+                grid_config["bbox_max"][1].as<float>(),
+                grid_config["bbox_max"][2].as<float>()};
         }
     }
     if (config["parameters"]) {
@@ -138,8 +139,7 @@ void load_config(std::string config_file, sweep::GridSpec& grid_spec,
             options.max_split = param_config["max_split"].as<int>();
         }
         if (param_config["with_insideness_check"]) {
-            options.with_insideness_check =
-                param_config["with_insideness_check"].as<bool>();
+            options.with_insideness_check = param_config["with_insideness_check"].as<bool>();
         }
         if (param_config["with_snapping"]) {
             options.with_snapping = param_config["with_snapping"].as<bool>();
@@ -148,34 +148,30 @@ void load_config(std::string config_file, sweep::GridSpec& grid_spec,
             options.cyclic = param_config["cyclic"].as<bool>();
         }
         if (param_config["volume_threshold"]) {
-            options.volume_threshold =
-                param_config["volume_threshold"].as<double>();
+            options.volume_threshold = param_config["volume_threshold"].as<double>();
         }
         if (param_config["face_count_threshold"]) {
-            options.face_count_threshold =
-                param_config["face_count_threshold"].as<size_t>();
+            options.face_count_threshold = param_config["face_count_threshold"].as<size_t>();
         }
         if (param_config["with_adaptive_refinement"]) {
-            options.with_adaptive_refinement =
-                param_config["with_adaptive_refinement"].as<bool>();
+            options.with_adaptive_refinement = param_config["with_adaptive_refinement"].as<bool>();
         }
         if (param_config["initial_time_samples"]) {
-            options.initial_time_samples =
-                param_config["initial_time_samples"].as<int>();
+            options.initial_time_samples = param_config["initial_time_samples"].as<int>();
         }
         if (param_config["min_tet_radius_ratio"]) {
-            options.min_tet_radius_ratio =
-                param_config["min_tet_radius_ratio"].as<double>();
+            options.min_tet_radius_ratio = param_config["min_tet_radius_ratio"].as<double>();
         }
         if (param_config["min_tet_edge_length"]) {
-            options.min_tet_edge_length =
-                param_config["min_tet_edge_length"].as<double>();
+            options.min_tet_edge_length = param_config["min_tet_edge_length"].as<double>();
         }
     }
 }
 
-int main(int argc, const char* argv[]) {
-    struct {
+int main(int argc, const char* argv[])
+{
+    struct
+    {
         std::string grid_file;
         std::string output_path;
         std::string config_file = "";
@@ -193,24 +189,24 @@ int main(int argc, const char* argv[]) {
     app.add_option("grid", args.grid_file, "Initial grid file")->required();
     app.add_option("output", args.output_path, "Output path")->required();
     app.add_option("-c,--config", args.config_file, "Configuration file");
-    app.add_option("-f,--function", args.function_file,
-                   "Implicit function file");
+    app.add_option("-f,--function", args.function_file, "Implicit function file");
     app.add_option("--ee,--epsilon-env", args.threshold, "Envelope threshold");
-    app.add_option("--es, --epsilon-sil", args.traj_threshold,
-                   "Silhouette threshold");
+    app.add_option("--es, --epsilon-sil", args.traj_threshold, "Silhouette threshold");
     app.add_flag(
-        "--without-inside-check", args.without_insideness_check,
+        "--without-inside-check",
+        args.without_insideness_check,
         "Turn on the refinement for the inside regions of the envelope");
-    app.add_option("-m,--max-splits", args.max_splits,
-                   "Maximum number of splits");
+    app.add_option("-m,--max-splits", args.max_splits, "Maximum number of splits");
     app.add_option("-r,--rotation-number", args.rot, "Number of rotations");
-    app.add_flag("--without-snapping", args.without_snapping,
-                 "Disable vertex snapping in iso-surfacing step");
     app.add_flag(
-        "--without-optimal-triangulation", args.without_opt_triangulation,
+        "--without-snapping",
+        args.without_snapping,
+        "Disable vertex snapping in iso-surfacing step");
+    app.add_flag(
+        "--without-optimal-triangulation",
+        args.without_opt_triangulation,
         "Disable optimal triangulation in iso-surfacing triangulation step");
-    app.add_flag("--cyclic", args.cyclic,
-                 "Whether the trajectory is cyclic or not");
+    app.add_flag("--cyclic", args.cyclic, "Whether the trajectory is cyclic or not");
     CLI11_PARSE(app, argc, argv);
 
     using Scalar = sweep::Scalar;
@@ -227,8 +223,7 @@ int main(int argc, const char* argv[]) {
     Eigen::MatrixXi F;
     igl::AABB<Eigen::MatrixXd, 3> tree;
     igl::FastWindingNumberBVH fwn_bvh;
-    std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)>
-        implicit_sweep;
+    std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> implicit_sweep;
     if (args.function_file != "") {
         if (args.function_file.find(".obj") != std::string::npos) {
             igl::read_triangle_mesh(args.function_file, V, F);
@@ -246,8 +241,7 @@ int main(int argc, const char* argv[]) {
             ///
             /// libigl input using mesh files (unstable gradients, need high
             /// resolution mesh input):
-            implicit_sweep = [&](Eigen::RowVector4d data)
-                -> std::pair<Scalar, Eigen::RowVector4d> {
+            implicit_sweep = [&](Eigen::RowVector4d data) -> std::pair<Scalar, Eigen::RowVector4d> {
                 Scalar value;
                 Eigen::RowVector4d gradient;
                 const double iso = 0.001;
@@ -272,10 +266,10 @@ int main(int argc, const char* argv[]) {
                 cp.normalize();
                 xyz_grad = (-s) * cp * Rt.inverse();
                 gradient.template head<3>() << xyz_grad;
-                point_velocity = (-Rt.inverse() * VRt * Rt.inverse() *
-                                      (P.transpose() - xt.transpose()) -
-                                  Rt.inverse() * vt.transpose())
-                                     .transpose();
+                point_velocity =
+                    (-Rt.inverse() * VRt * Rt.inverse() * (P.transpose() - xt.transpose()) -
+                     Rt.inverse() * vt.transpose())
+                        .transpose();
                 gradient(3) = (-s) * cp.dot(point_velocity);
                 return {value, gradient};
             };
@@ -370,9 +364,7 @@ int main(int argc, const char* argv[]) {
         }
     } else {
         /// use hard coded models as default/testing purpose.
-        implicit_sweep = [&](Eigen::RowVector4d data) {
-            return flippingDonutFullTurn(data);
-        };
+        implicit_sweep = [&](Eigen::RowVector4d data) { return flippingDonutFullTurn(data); };
     }
 
     sweep::GridSpec grid_spec = load_grid_spec(args.grid_file);
@@ -406,18 +398,15 @@ int main(int argc, const char* argv[]) {
         if (std::filesystem::create_directory(output_path)) {
             sweep::logger().info("Created output directory: {}", output_path);
         } else {
-            sweep::logger().error("Failed to create output directory: {}",
-                                  output_path);
+            sweep::logger().error("Failed to create output directory: {}", output_path);
         }
     } else {
-        sweep::logger().info("Output directory already exists: {}",
-                             output_path);
+        sweep::logger().info("Output directory already exists: {}", output_path);
     }
 
     lagrange::io::save_mesh(output_path + "/envelope.msh", envelope);
     lagrange::io::save_mesh(output_path + "/sweep_surface.msh", sweep_surface);
-    lagrange::io::save_mesh(output_path + "/arrangement.msh",
-                            sweep_arrangement);
+    lagrange::io::save_mesh(output_path + "/arrangement.msh", sweep_arrangement);
     save_features(output_path + "/features.obj", sweep_arrangement);
 #if SAVE_CONTOUR
     // mtet::save_mesh(output_path + "/tet_grid.msh", grid);
@@ -429,8 +418,7 @@ int main(int argc, const char* argv[]) {
                           std::chrono::high_resolution_clock::now())
                           .time_since_epoch()
                           .count();
-    sweep::logger().info("Saving time: {} seconds",
-                         (saving_end - saving_start) * 1e-6);
+    sweep::logger().info("Saving time: {} seconds", (saving_end - saving_start) * 1e-6);
 
     return 0;
 }

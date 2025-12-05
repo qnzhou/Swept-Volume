@@ -17,8 +17,8 @@
 #include <algorithm>
 
 template <typename Scalar, typename Index>
-lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
-    mtetcol::Contour<4>& isocontour) {
+lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(mtetcol::Contour<4>& isocontour)
+{
     lagrange::SurfaceMesh<Scalar, Index> envelope;
 
     // Port the isocontour into lagrange mesh
@@ -28,8 +28,10 @@ lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
     // Add vertices and time
     envelope.add_vertices(num_vertices);
     envelope.template create_attribute<double>(
-        "time", lagrange::AttributeElement::Vertex,
-        lagrange::AttributeUsage::Scalar, 1);
+        "time",
+        lagrange::AttributeElement::Vertex,
+        lagrange::AttributeUsage::Scalar,
+        1);
     auto time_values = attribute_vector_ref<double>(envelope, "time");
 
     for (size_t i = 0; i < num_vertices; i++) {
@@ -56,7 +58,8 @@ lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
             auto seg = isocontour.get_segment(seg_id);
             polygon[ind] = (seg_ori ? seg[0] : seg[1]);
             std::pair<mtetcol::Index, mtetcol::Index> edge_key = {
-                std::min(seg[0], seg[1]), std::max(seg[0], seg[1])};
+                std::min(seg[0], seg[1]),
+                std::max(seg[0], seg[1])};
 
             ind++;
         }
@@ -65,8 +68,10 @@ lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
 
     // Add regular attribute
     envelope.template create_attribute<uint8_t>(
-        "regular", lagrange::AttributeElement::Facet,
-        lagrange::AttributeUsage::Scalar, 1);
+        "regular",
+        lagrange::AttributeElement::Facet,
+        lagrange::AttributeUsage::Scalar,
+        1);
     auto regular_values = attribute_vector_ref<uint8_t>(envelope, "regular");
     for (size_t i = 0; i < num_cycles; i++) {
         regular_values[i] = isocontour.is_cycle_regular(i) ? 1 : 0;
@@ -79,27 +84,24 @@ template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     const lagrange::SurfaceMesh<Scalar, Index>& envelope,
     Scalar vol_threshold,
-    size_t face_count_threshold) {
+    size_t face_count_threshold)
+{
     using Point = Eigen::Matrix<Scalar, 3, 1>;
 
     // Compute arrangement
     auto V = vertex_view(envelope).template cast<double>();
     auto F = facet_view(envelope).template cast<int>();
     auto T = attribute_vector_view<Scalar>(envelope, "time");
-    arrangement::VectorI face_labels =
-        Eigen::VectorXi::LinSpaced(F.rows(), 0, F.rows() - 1);
-    auto engine =
-        arrangement::Arrangement::create_mesh_arrangement(V, F, face_labels);
+    arrangement::VectorI face_labels = Eigen::VectorXi::LinSpaced(F.rows(), 0, F.rows() - 1);
+    auto engine = arrangement::Arrangement::create_mesh_arrangement(V, F, face_labels);
     engine->run();
 
     lagrange::SurfaceMesh<Scalar, Index> sweep_arrangement;
 
-    const auto& cell_data = engine->get_cells();  // (#facets x 2) array
-    const auto& patches = engine->get_patches();  // list of facet indices
-    const auto& parent_facets =
-        engine->get_out_face_labels();  // size = #facets
-    const auto& winding_number =
-        engine->get_winding_number();  // (#facets x 2) array
+    const auto& cell_data = engine->get_cells(); // (#facets x 2) array
+    const auto& patches = engine->get_patches(); // list of facet indices
+    const auto& parent_facets = engine->get_out_face_labels(); // size = #facets
+    const auto& winding_number = engine->get_winding_number(); // (#facets x 2) array
 
     const auto& out_vertices = engine->get_vertices();
     const auto& arrangement_faces = engine->get_faces();
@@ -115,41 +117,35 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     sweep_arrangement.add_triangles(static_cast<Index>(num_facets));
     {
         auto facets = facet_ref(sweep_arrangement);
-        std::copy_n(arrangement_faces.data(), arrangement_faces.size(),
-                    facets.data());
+        std::copy_n(arrangement_faces.data(), arrangement_faces.size(), facets.data());
     }
     sweep_arrangement.template create_attribute<Index>(
-        "envelope_facet_id", lagrange::AttributeElement::Facet,
-        lagrange::AttributeUsage::Scalar, 1);
-    auto envelope_facet_id =
-        attribute_vector_ref<Index>(sweep_arrangement, "envelope_facet_id");
-    std::copy_n(parent_facets.data(), parent_facets.size(),
-                envelope_facet_id.data());
+        "envelope_facet_id",
+        lagrange::AttributeElement::Facet,
+        lagrange::AttributeUsage::Scalar,
+        1);
+    auto envelope_facet_id = attribute_vector_ref<Index>(sweep_arrangement, "envelope_facet_id");
+    std::copy_n(parent_facets.data(), parent_facets.size(), envelope_facet_id.data());
     sweep_arrangement.initialize_edges();
 
     // Build cell adjacency graph and compute cell volumes
-    constexpr int32_t invalid_winding_number =
-        std::numeric_limits<int32_t>::max();
+    constexpr int32_t invalid_winding_number = std::numeric_limits<int32_t>::max();
     std::vector<ankerl::unordered_dense::set<Index>> cell_graph(num_cells);
     std::vector<Scalar> cell_volumes(num_cells, 0);
     std::vector<size_t> cell_face_counts(num_cells, 0);
-    std::vector<int32_t> cell_winding_numbers(num_cells,
-                                              invalid_winding_number);
+    std::vector<int32_t> cell_winding_numbers(num_cells, invalid_winding_number);
     for (size_t fid = 0; fid < num_facets; fid++) {
-        Index c0 = static_cast<Index>(
-            cell_data(patches[fid], 0));  // Cell on the positive side
-        Index c1 = static_cast<Index>(
-            cell_data(patches[fid], 1));  // Cell on the negative side
-        int w0 = winding_number(fid, 0);  // Winding number on the positive side
-        int w1 = winding_number(fid, 1);  // Winding number on the negative side
+        Index c0 = static_cast<Index>(cell_data(patches[fid], 0)); // Cell on the positive side
+        Index c1 = static_cast<Index>(cell_data(patches[fid], 1)); // Cell on the negative side
+        int w0 = winding_number(fid, 0); // Winding number on the positive side
+        int w1 = winding_number(fid, 1); // Winding number on the negative side
 
         if (cell_winding_numbers[c0] == invalid_winding_number) {
             cell_winding_numbers[c0] = w0;
         } else {
             if (cell_winding_numbers[c0] != w0) {
                 // This should never happen
-                throw std::runtime_error(
-                    "Inconsistent winding numbers detected!");
+                throw std::runtime_error("Inconsistent winding numbers detected!");
             }
         }
         if (cell_winding_numbers[c1] == invalid_winding_number) {
@@ -157,8 +153,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         } else {
             if (cell_winding_numbers[c1] != w1) {
                 // This should never happen
-                throw std::runtime_error(
-                    "Inconsistent winding numbers detected!");
+                throw std::runtime_error("Inconsistent winding numbers detected!");
             }
         }
 
@@ -177,8 +172,9 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
         cell_face_counts[c1]++;
     }
     auto cell_is_small = [&](Index cid) {
-        return (std::abs(cell_volumes[cid]) < vol_threshold ||
-                cell_face_counts[cid] < face_count_threshold);
+        return (
+            std::abs(cell_volumes[cid]) < vol_threshold ||
+            cell_face_counts[cid] < face_count_threshold);
     };
 
     std::vector<int> parent_cell(num_cells);
@@ -206,20 +202,20 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
 
     // Compute sweep surface facets
     sweep_arrangement.template create_attribute<int8_t>(
-        "valid", lagrange::AttributeElement::Facet,
-        lagrange::AttributeUsage::Scalar, 1);
+        "valid",
+        lagrange::AttributeElement::Facet,
+        lagrange::AttributeUsage::Scalar,
+        1);
     auto is_valid = attribute_vector_ref<int8_t>(sweep_arrangement, "valid");
     is_valid.setZero();
     size_t num_valid_facets = 0;
     for (size_t fid = 0; fid < num_facets; fid++) {
-        int c0 = cell_data(patches[fid], 0);  // Cell on the positive side
-        int c1 = cell_data(patches[fid], 1);  // Cell on the negative side
-        c0 = get_parent(get_parent, c0);  // Find the representative parent cell
-        c1 = get_parent(get_parent, c1);  // Find the representative parent cell
-        int w0 =
-            cell_winding_numbers[c0];  // Winding number on the positive side
-        int w1 =
-            cell_winding_numbers[c1];  // Winding number on the negative side
+        int c0 = cell_data(patches[fid], 0); // Cell on the positive side
+        int c1 = cell_data(patches[fid], 1); // Cell on the negative side
+        c0 = get_parent(get_parent, c0); // Find the representative parent cell
+        c1 = get_parent(get_parent, c1); // Find the representative parent cell
+        int w0 = cell_winding_numbers[c0]; // Winding number on the positive side
+        int w1 = cell_winding_numbers[c1]; // Winding number on the negative side
 
         if (w0 == 0 && w1 != 0) {
             is_valid[fid] = 1;
@@ -253,8 +249,10 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
     };
 
     sweep_arrangement.template create_attribute<Scalar>(
-        "time", lagrange::AttributeElement::Corner,
-        lagrange::AttributeUsage::Scalar, 1);
+        "time",
+        lagrange::AttributeElement::Corner,
+        lagrange::AttributeUsage::Scalar,
+        1);
     auto time_values = attribute_vector_ref<Scalar>(sweep_arrangement, "time");
     Index count = 0;
     // TODO: parallelize this loop
@@ -277,15 +275,15 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
 
     // Extract feature edges
     sweep_arrangement.template create_attribute<int8_t>(
-        "is_feature", lagrange::AttributeElement::Edge,
-        lagrange::AttributeUsage::Scalar, 1);
-    auto is_feature =
-        attribute_vector_ref<int8_t>(sweep_arrangement, "is_feature");
+        "is_feature",
+        lagrange::AttributeElement::Edge,
+        lagrange::AttributeUsage::Scalar,
+        1);
+    auto is_feature = attribute_vector_ref<int8_t>(sweep_arrangement, "is_feature");
     is_feature.setZero();
     Index num_edges = sweep_arrangement.get_num_edges();
     for (Index eid = 0; eid < num_edges; eid++) {
-        Index edge_valence =
-            sweep_arrangement.count_num_corners_around_edge(eid);
+        Index edge_valence = sweep_arrangement.count_num_corners_around_edge(eid);
         if (edge_valence != 2) {
             bool feature_edge = false;
             sweep_arrangement.foreach_facet_around_edge(eid, [&](Index fid) {
@@ -302,7 +300,8 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
 
 template <typename Scalar, typename Index>
 lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
-    lagrange::SurfaceMesh<Scalar, Index>& sweep_arrangement) {
+    lagrange::SurfaceMesh<Scalar, Index>& sweep_arrangement)
+{
     Index num_arrangement_facets = sweep_arrangement.get_num_facets();
     auto V = vertex_view(sweep_arrangement);
     auto F = facet_view(sweep_arrangement);
@@ -310,8 +309,9 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
     auto time_values = attribute_vector_view<Scalar>(sweep_arrangement, "time");
 
     lagrange::SurfaceMesh<Scalar, Index> sweep_surface;
-    sweep_surface.add_vertices(static_cast<Index>(V.rows()),
-                               {V.data(), static_cast<size_t>(V.size())});
+    sweep_surface.add_vertices(
+        static_cast<Index>(V.rows()),
+        {V.data(), static_cast<size_t>(V.size())});
 
     Index num_valid_facets = 0;
     for (Index fid = 0; fid < num_arrangement_facets; fid++) {
@@ -333,10 +333,11 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
     }
 
     sweep_surface.template create_attribute<Scalar>(
-        "time", lagrange::AttributeElement::Corner,
-        lagrange::AttributeUsage::Scalar, 1);
-    auto sweep_time_values =
-        attribute_vector_ref<Scalar>(sweep_surface, "time");
+        "time",
+        lagrange::AttributeElement::Corner,
+        lagrange::AttributeUsage::Scalar,
+        1);
+    auto sweep_time_values = attribute_vector_ref<Scalar>(sweep_surface, "time");
 
     count = 0;
     for (Index fid = 0; fid < num_arrangement_facets; fid++) {
@@ -344,22 +345,15 @@ lagrange::SurfaceMesh<Scalar, Index> extract_sweep_surface_from_arrangement(
             continue;
         }
         const Index sweep_c_begin = sweep_surface.get_facet_corner_begin(count);
-        const Index arrang_c_begin =
-            sweep_arrangement.get_facet_corner_begin(fid);
+        const Index arrang_c_begin = sweep_arrangement.get_facet_corner_begin(fid);
         if (is_valid[fid] == 1) {
-            sweep_time_values[sweep_c_begin + 0] =
-                time_values[arrang_c_begin + 0];
-            sweep_time_values[sweep_c_begin + 1] =
-                time_values[arrang_c_begin + 1];
-            sweep_time_values[sweep_c_begin + 2] =
-                time_values[arrang_c_begin + 2];
+            sweep_time_values[sweep_c_begin + 0] = time_values[arrang_c_begin + 0];
+            sweep_time_values[sweep_c_begin + 1] = time_values[arrang_c_begin + 1];
+            sweep_time_values[sweep_c_begin + 2] = time_values[arrang_c_begin + 2];
         } else {
-            sweep_time_values[sweep_c_begin + 0] =
-                time_values[arrang_c_begin + 2];
-            sweep_time_values[sweep_c_begin + 1] =
-                time_values[arrang_c_begin + 1];
-            sweep_time_values[sweep_c_begin + 2] =
-                time_values[arrang_c_begin + 0];
+            sweep_time_values[sweep_c_begin + 0] = time_values[arrang_c_begin + 2];
+            sweep_time_values[sweep_c_begin + 1] = time_values[arrang_c_begin + 1];
+            sweep_time_values[sweep_c_begin + 2] = time_values[arrang_c_begin + 0];
         }
         count++;
     }

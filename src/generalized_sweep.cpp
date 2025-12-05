@@ -18,10 +18,13 @@
 
 namespace sweep {
 
-std::tuple<std::vector<Scalar>, std::vector<Index>,
-           std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
-refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
-            const SweepOptions& options) {
+std::tuple<
+    std::vector<Scalar>,
+    std::vector<Index>,
+    std::vector<std::vector<Scalar>>,
+    std::vector<std::vector<Scalar>>>
+refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid, const SweepOptions& options)
+{
     logger().info("Adaptively refine the background grid...");
 
     // TODO: investigate why saving and loading is necessary here???
@@ -36,11 +39,20 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     std::array<double, timer_amount> profileTimer{};
     std::array<size_t, timer_amount> profileCount{};
     spdlog::set_level(spdlog::level::off);
-    if (!gridRefine(grid, vertexMap, insideMap, f, options.epsilon_env,
-                    options.epsilon_sil, options.max_split,
-                    options.with_insideness_check, profileTimer, profileCount,
-                    options.initial_time_samples, options.min_tet_radius_ratio,
-                    options.min_tet_edge_length)) {
+    if (!gridRefine(
+            grid,
+            vertexMap,
+            insideMap,
+            f,
+            options.epsilon_env,
+            options.epsilon_sil,
+            options.max_split,
+            options.with_insideness_check,
+            profileTimer,
+            profileCount,
+            options.initial_time_samples,
+            options.min_tet_radius_ratio,
+            options.min_tet_edge_length)) {
         throw std::runtime_error("ERROR: grid generation failed");
     };
     spdlog::set_level(spdlog::level::info);
@@ -50,16 +62,18 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     std::vector<mtetcol::Index> simps;
     std::vector<std::vector<double>> time;
     std::vector<std::vector<double>> values;
-    convert_4d_grid_mtetcol(grid, vertexMap, verts, simps, time, values,
-                            cyclic);
+    convert_4d_grid_mtetcol(grid, vertexMap, verts, simps, time, values, cyclic);
 
     return {verts, simps, time, values};
 }
 
-std::tuple<std::vector<Scalar>, std::vector<Index>,
-           std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
-evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
-              const SweepOptions& options) {
+std::tuple<
+    std::vector<Scalar>,
+    std::vector<Index>,
+    std::vector<std::vector<Scalar>>,
+    std::vector<std::vector<Scalar>>>
+evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid, const SweepOptions& options)
+{
     size_t num_vertices = grid.get_num_vertices();
     size_t num_tets = grid.get_num_tets();
 
@@ -75,19 +89,17 @@ evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     // Extract vertices
     ankerl::unordered_dense::map<uint64_t, Index> vertex_map;
     vertex_map.reserve(num_vertices);
-    grid.seq_foreach_vertex(
-        [&](mtet::VertexId vid, std::span<const mtet::Scalar, 3> pos) {
-            Index idx = static_cast<Index>(vertex_map.size());
-            vertex_map[value_of(vid)] = idx;
-            verts[idx * 3 + 0] = static_cast<mtetcol::Scalar>(pos[0]);
-            verts[idx * 3 + 1] = static_cast<mtetcol::Scalar>(pos[1]);
-            verts[idx * 3 + 2] = static_cast<mtetcol::Scalar>(pos[2]);
-        });
+    grid.seq_foreach_vertex([&](mtet::VertexId vid, std::span<const mtet::Scalar, 3> pos) {
+        Index idx = static_cast<Index>(vertex_map.size());
+        vertex_map[value_of(vid)] = idx;
+        verts[idx * 3 + 0] = static_cast<mtetcol::Scalar>(pos[0]);
+        verts[idx * 3 + 1] = static_cast<mtetcol::Scalar>(pos[1]);
+        verts[idx * 3 + 2] = static_cast<mtetcol::Scalar>(pos[2]);
+    });
 
     // Extract tets
     size_t tet_count = 0;
-    grid.seq_foreach_tet([&](mtet::TetId tid,
-                             std::span<const mtet::VertexId, 4> tet_verts) {
+    grid.seq_foreach_tet([&](mtet::TetId tid, std::span<const mtet::VertexId, 4> tet_verts) {
         for (size_t i = 0; i < 4; ++i) {
             simps[tet_count * 4 + i] =
                 static_cast<mtetcol::Index>(vertex_map[value_of(tet_verts[i])]);
@@ -101,17 +113,13 @@ evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
         dr::blocked_range<size_t>(0, num_vertices, 1),
         [&](dr::blocked_range<size_t> idx_range) {
             for (size_t vid = idx_range.begin(); vid < idx_range.end(); vid++) {
-                for (size_t tid = 0; tid < options.initial_time_samples;
-                     tid++) {
-                    double t = static_cast<double>(tid) /
-                               (options.initial_time_samples - 1);
+                for (size_t tid = 0; tid < options.initial_time_samples; tid++) {
+                    double t = static_cast<double>(tid) / (options.initial_time_samples - 1);
                     Eigen::RowVector4d eval_point;
-                    eval_point << verts[vid * 3 + 0], verts[vid * 3 + 1],
-                        verts[vid * 3 + 2], t;
+                    eval_point << verts[vid * 3 + 0], verts[vid * 3 + 1], verts[vid * 3 + 2], t;
                     auto eval = f(eval_point);
                     time[vid].push_back(t);
-                    values[vid].push_back(
-                        eval.second[3]);  // Value is time derivative.
+                    values[vid].push_back(eval.second[3]); // Value is time derivative.
                 }
             }
         });
@@ -120,8 +128,10 @@ evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
 }
 
 lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
-    const SpaceTimeFunction& f, mtetcol::Contour<4>& contour,
-    const SweepOptions& options) {
+    const SpaceTimeFunction& f,
+    mtetcol::Contour<4>& contour,
+    const SweepOptions& options)
+{
     constexpr int dim = 4;
     size_t num_contour_vertices = contour.get_num_vertices();
     std::vector<double> function_values(num_contour_vertices);
@@ -137,8 +147,7 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
     }
 
     // Extract isocontour
-    auto isocontour = contour.isocontour(function_values, gradient_values,
-                                         options.with_snapping);
+    auto isocontour = contour.isocontour(function_values, gradient_values, options.with_snapping);
     if (!isocontour.is_manifold()) {
         throw std::runtime_error("ERROR: extracted isocontour is not manifold");
     }
@@ -146,22 +155,30 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
         throw std::runtime_error("ERROR: extracted isocontour has zero cycles");
     }
     isocontour.triangulate_cycles(true);
-    lagrange::SurfaceMesh<Scalar, Index> envelope =
-        isocontour_to_mesh<Scalar, Index>(isocontour);
+    lagrange::SurfaceMesh<Scalar, Index> envelope = isocontour_to_mesh<Scalar, Index>(isocontour);
     envelope.initialize_edges();
 
     return envelope;
 }
 
-void log_config(const GridSpec& grid_spec, const SweepOptions& options) {
+void log_config(const GridSpec& grid_spec, const SweepOptions& options)
+{
     sweep::logger().info("=== Generalized Sweep Parameters ===");
-    sweep::logger().info("Grid resolution: {} x {} x {}",
-                         grid_spec.resolution[0], grid_spec.resolution[1],
-                         grid_spec.resolution[2]);
-    sweep::logger().info("Grid bbox min: ({}, {}, {})", grid_spec.bbox_min[0],
-                         grid_spec.bbox_min[1], grid_spec.bbox_min[2]);
-    sweep::logger().info("Grid bbox max: ({}, {}, {})", grid_spec.bbox_max[0],
-                         grid_spec.bbox_max[1], grid_spec.bbox_max[2]);
+    sweep::logger().info(
+        "Grid resolution: {} x {} x {}",
+        grid_spec.resolution[0],
+        grid_spec.resolution[1],
+        grid_spec.resolution[2]);
+    sweep::logger().info(
+        "Grid bbox min: ({}, {}, {})",
+        grid_spec.bbox_min[0],
+        grid_spec.bbox_min[1],
+        grid_spec.bbox_min[2]);
+    sweep::logger().info(
+        "Grid bbox max: ({}, {}, {})",
+        grid_spec.bbox_max[0],
+        grid_spec.bbox_max[1],
+        grid_spec.bbox_max[2]);
     sweep::logger().info("Envelope epsilon: {}", options.epsilon_env);
     sweep::logger().info("Silhouette epsilon: {}", options.epsilon_sil);
     sweep::logger().info("Max splits: {}", options.max_split);
@@ -169,27 +186,22 @@ void log_config(const GridSpec& grid_spec, const SweepOptions& options) {
     sweep::logger().info("Vertex snapping: {}", options.with_snapping);
     sweep::logger().info("Cyclic trajectory: {}", options.cyclic);
     sweep::logger().info("Volume threshold: {}", options.volume_threshold);
-    sweep::logger().info("Face count threshold: {}",
-                         options.face_count_threshold);
-    sweep::logger().info("Adaptive refinement: {}",
-                         options.with_adaptive_refinement);
-    sweep::logger().info("Initial time samples: {}",
-                         options.initial_time_samples);
-    sweep::logger().info("Minimum tet radius ratio: {}",
-                         options.min_tet_radius_ratio);
-    sweep::logger().info("Minimum tet edge length: {}",
-                         options.min_tet_edge_length);
+    sweep::logger().info("Face count threshold: {}", options.face_count_threshold);
+    sweep::logger().info("Adaptive refinement: {}", options.with_adaptive_refinement);
+    sweep::logger().info("Initial time samples: {}", options.initial_time_samples);
+    sweep::logger().info("Minimum tet radius ratio: {}", options.min_tet_radius_ratio);
+    sweep::logger().info("Minimum tet edge length: {}", options.min_tet_edge_length);
     sweep::logger().info("=====================================");
 }
 
-SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
-                              SweepOptions options) {
+SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec, SweepOptions options)
+{
     log_config(grid_spec, options);
 
     auto init_grid_start = std::chrono::high_resolution_clock::now();
     SweepResult result;
-    auto grid = mtet::generate_tet_grid(grid_spec.resolution,
-                                        grid_spec.bbox_min, grid_spec.bbox_max);
+    auto grid =
+        mtet::generate_tet_grid(grid_spec.resolution, grid_spec.bbox_min, grid_spec.bbox_max);
     auto init_grid_end = std::chrono::high_resolution_clock::now();
     logger().info(
         "Initial grid generation time: {} seconds",
@@ -213,14 +225,15 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
         auto evaluate_end = std::chrono::high_resolution_clock::now();
         logger().info(
             "Grid evaluation time: {} seconds",
-            std::chrono::duration<double>(evaluate_end - evaluate_start)
-                .count());
+            std::chrono::duration<double>(evaluate_end - evaluate_start).count());
     }
 
-    std::function<std::span<double>(size_t)> time_func =
-        [&](size_t index) -> std::span<double> { return time[index]; };
-    std::function<std::span<double>(size_t)> values_func =
-        [&](size_t index) -> std::span<double> { return values[index]; };
+    std::function<std::span<double>(size_t)> time_func = [&](size_t index) -> std::span<double> {
+        return time[index];
+    };
+    std::function<std::span<double>(size_t)> values_func = [&](size_t index) -> std::span<double> {
+        return values[index];
+    };
     mtetcol::SimplicialColumn<4> columns;
     columns.set_vertices(verts);
     columns.set_simplices(simps);
@@ -233,8 +246,7 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
     auto silhouette_end = std::chrono::high_resolution_clock::now();
     logger().info(
         "Silhouette extraction time: {} seconds",
-        std::chrono::duration<double>(silhouette_end - silhouette_start)
-            .count());
+        std::chrono::duration<double>(silhouette_end - silhouette_start).count());
 
     if (!contour.is_manifold()) {
         throw std::runtime_error("ERROR: extracted contour is not manifold");
@@ -248,25 +260,23 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
         std::chrono::duration<double>(envelope_end - envelope_start).count());
 
     auto arrangement_start = std::chrono::high_resolution_clock::now();
-    result.arrangement =
-        compute_envelope_arrangement(result.envelope, options.volume_threshold,
-                                     options.face_count_threshold);
+    result.arrangement = compute_envelope_arrangement(
+        result.envelope,
+        options.volume_threshold,
+        options.face_count_threshold);
     auto arrangement_end = std::chrono::high_resolution_clock::now();
     logger().info(
         "Arrangement computation time: {} seconds",
-        std::chrono::duration<double>(arrangement_end - arrangement_start)
-            .count());
+        std::chrono::duration<double>(arrangement_end - arrangement_start).count());
 
     auto sweep_surface_start = std::chrono::high_resolution_clock::now();
-    result.sweep_surface =
-        extract_sweep_surface_from_arrangement(result.arrangement);
+    result.sweep_surface = extract_sweep_surface_from_arrangement(result.arrangement);
     auto sweep_surface_end = std::chrono::high_resolution_clock::now();
     logger().info(
         "Sweep surface extraction time: {} seconds",
-        std::chrono::duration<double>(sweep_surface_end - sweep_surface_start)
-            .count());
+        std::chrono::duration<double>(sweep_surface_end - sweep_surface_start).count());
 
     return result;
 }
 
-}  // namespace sweep
+} // namespace sweep

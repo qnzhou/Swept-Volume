@@ -9,47 +9,46 @@
 #define io_h
 
 
-#include "adaptive_column_grid.h"
 #include <mshio/mshio.h>
+#include "adaptive_column_grid.h"
 
 #include <fstream>
 
 #include <lagrange/SurfaceMesh.h>
 #include <lagrange/views.h>
 
-void convert_4d_grid_col(mtet::MTetMesh grid,
-                         vertExtrude vertexMap,
-                         std::vector<std::array<double, 3>> &verts,
-                         std::vector<std::array<size_t, 4>> &simps,
-                         std::vector<std::vector<double>> &time,
-                         std::vector<std::vector<double>> &values);
+void convert_4d_grid_col(
+    mtet::MTetMesh grid,
+    vertExtrude vertexMap,
+    std::vector<std::array<double, 3>>& verts,
+    std::vector<std::array<size_t, 4>>& simps,
+    std::vector<std::vector<double>>& time,
+    std::vector<std::vector<double>>& values);
 
-void convert_4d_grid_mtetcol(mtet::MTetMesh grid,
-                             vertExtrude vertexMap,
-                             std::vector<double> &verts,
-                             std::vector<uint32_t> &simps,
-                             std::vector<std::vector<double>> &time,
-                             std::vector<std::vector<double>> &values,
-                             bool cyclic);
+void convert_4d_grid_mtetcol(
+    mtet::MTetMesh grid,
+    vertExtrude vertexMap,
+    std::vector<double>& verts,
+    std::vector<uint32_t>& simps,
+    std::vector<std::vector<double>>& time,
+    std::vector<std::vector<double>>& values,
+    bool cyclic);
 
-mshio::MshSpec generate_spec(
-                             const Eigen::MatrixXd& V,
-                             const Eigen::MatrixXi& F,
-                             TimeMap timeMap);
+mshio::MshSpec generate_spec(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, TimeMap timeMap);
 
 Eigen::VectorXd propagate_labels_bfs(
-                                     const Eigen::MatrixXd& V,   // n x 3
-                                     const Eigen::MatrixXi& F,   // m x 3
-                                     const TimeMap& timeMap);
+    const Eigen::MatrixXd& V, // n x 3
+    const Eigen::MatrixXi& F, // m x 3
+    const TimeMap& timeMap);
 
 void backfill_timeMap_from_labels(
-                                  const Eigen::MatrixXd& V,
-                                  const Eigen::VectorXd& L,
-                                  TimeMap& timeMap);
+    const Eigen::MatrixXd& V,
+    const Eigen::VectorXd& L,
+    TimeMap& timeMap);
 
 void save_grid_for_mathematica(
-        std::string_view filename,
-        mtet::MTetMesh grid,
-        vertExtrude vertexMap);
+    std::string_view filename,
+    mtet::MTetMesh grid,
+    vertExtrude vertexMap);
 
 #endif /* io_h */

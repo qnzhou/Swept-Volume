@@ -10,8 +10,6 @@
 #include "col_gridgen.h"
 #include <sweep/logger.h>
 
-//namespace dr = drjit; // For nanothread
-#define MIN_EDGE_LEN 1e-5
 #define parallel_bezier 0
 
 /// Sample the list of 5-cells based on the base tetrahedra and 4 lists of time samples at its vertices. The extrusion/sampling is based on lowest time stamp, the second lowest time stamp, and the vertex id comparing the four incremental time stamps at each vertex.
@@ -318,8 +316,20 @@ void compare_time(const double tet_time,
 std::vector<uint32_t> one_column_simp = {0, 1, 2, 3};
 
 ///see descriptions in header
-bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &insideMap, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const double threshold, const double traj_threshold, const int max_splits,
-                const int insideness_check, std::array<double, timer_amount>& profileTimer, std::array<size_t, timer_amount>& profileCount, size_t initial_time_samples){
+bool gridRefine(
+        mtet::MTetMesh &grid,
+        vertExtrude &vertexMap,
+        insidenessMap &insideMap,
+        const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func,
+        const double threshold,
+        const double traj_threshold,
+        const int max_splits,
+        const int insideness_check,
+        std::array<double, timer_amount>& profileTimer,
+        std::array<size_t, timer_amount>& profileCount,
+        size_t initial_time_samples,
+        double min_tet_radius_ratio,
+        double min_tet_edge_length){
     init5CGrid(initial_time_samples, grid, func, MAX_TIME, vertexMap);
     double min_tet_ratio = 1.0;
     ///
@@ -371,7 +381,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
         std::valarray<double> p2(baseCoord[2].data(), 3);
         std::valarray<double> p3(baseCoord[3].data(), 3);
         auto tet_ratio = tet_radius_ratio({p0, p1, p2, p3});
-        if (tet_ratio < 1e-5) insideMap[vs] = true;
+        if (tet_ratio < min_tet_radius_ratio) insideMap[vs] = true;
         /// Compute longest spatial edge
         longest_edge_length = 0;
         bool baseSub = false;
@@ -453,7 +463,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
                     }
                 }else{
                     if (!baseSub){
-                        if (longest_edge_length * 0.5f > MIN_EDGE_LEN){
+                        if (longest_edge_length > min_tet_edge_length){
                             spaceQ.emplace_back(longest_edge_length, tid, longest_edge);
                             std::push_heap(spaceQ.begin(), spaceQ.end(), compSpace);
                             baseSub = true;
@@ -473,7 +483,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
             }
             bool ret = refine3D(verts_3d, threshold);
             if (ret){
-                if (longest_edge_length * 0.5f > MIN_EDGE_LEN){
+                if (longest_edge_length > min_tet_edge_length){
                     spaceQ.emplace_back(longest_edge_length, tid, longest_edge);
                     std::push_heap(spaceQ.begin(), spaceQ.end(), compSpace);
                     baseSub = true;
@@ -486,7 +496,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
             }
             bool ret = refine3D(verts_3d, threshold);
             if (ret){
-                if (longest_edge_length * 0.5f > MIN_EDGE_LEN){
+                if (longest_edge_length > min_tet_edge_length){
                     spaceQ.emplace_back(longest_edge_length, tid, longest_edge);
                     std::push_heap(spaceQ.begin(), spaceQ.end(), compSpace);
                     baseSub = true;
@@ -593,7 +603,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
                             vert.valGradList = func(vert.coord);
                         }
                         if (refine3D(verts_3d, threshold)){
-                            if (longest_edge_length * 0.5f > MIN_EDGE_LEN){
+                            if (longest_edge_length > min_tet_edge_length){
                                 spaceQ.emplace_back(longest_edge_length, tid, longest_edge);
                                 std::push_heap(spaceQ.begin(), spaceQ.end(), compSpace);
                                 baseSub = true;
@@ -607,7 +617,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
 #if time_profile
                         Timer non_simple_poly_timer(non_simple_poly, [&](auto timer, auto ms){combine_timer(profileTimer, profileCount, timer, ms);});
 #endif
-                        if (longest_edge_length * 0.5f > MIN_EDGE_LEN){
+                        if (longest_edge_length > min_tet_edge_length){
                             spaceQ.emplace_back(longest_edge_length, tid, longest_edge);
                             std::push_heap(spaceQ.begin(), spaceQ.end(), compSpace);
                             baseSub = true;

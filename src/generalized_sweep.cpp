@@ -38,8 +38,9 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     spdlog::set_level(spdlog::level::off);
     if (!gridRefine(grid, vertexMap, insideMap, f, options.epsilon_env,
                     options.epsilon_sil, options.max_split,
-                    options.with_insideness_check, profileTimer,
-                    profileCount, options.initial_time_samples)) {
+                    options.with_insideness_check, profileTimer, profileCount,
+                    options.initial_time_samples, options.min_tet_radius_ratio,
+                    options.min_tet_edge_length)) {
         throw std::runtime_error("ERROR: grid generation failed");
     };
     spdlog::set_level(spdlog::level::info);
@@ -174,6 +175,10 @@ void log_config(const GridSpec& grid_spec, const SweepOptions& options) {
                          options.with_adaptive_refinement);
     sweep::logger().info("Initial time samples: {}",
                          options.initial_time_samples);
+    sweep::logger().info("Minimum tet radius ratio: {}",
+                         options.min_tet_radius_ratio);
+    sweep::logger().info("Minimum tet edge length: {}",
+                         options.min_tet_edge_length);
     sweep::logger().info("=====================================");
 }
 

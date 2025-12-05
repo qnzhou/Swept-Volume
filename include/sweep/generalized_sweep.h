@@ -113,6 +113,16 @@ struct SweepOptions {
 
     /// Number of initial uniform time samples per spatial grid vertex.
     size_t initial_time_samples = 8;
+
+    /// The minimum acceptable tetrahedron radius ratio during grid refinement.
+    ///
+    /// Tets with in-radius to circum-radius ratio below this threshold will not be refined further.
+    Scalar min_tet_radius_ratio = 1e-5;
+
+    /// Minimum acceptable tetrahedron edge length during grid refinement.
+    ///
+    /// Tets with longest edge length below this threshold will not be refined further.
+    Scalar min_tet_edge_length = 2e-5;
 };
 
 ///

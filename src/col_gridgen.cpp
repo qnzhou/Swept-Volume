@@ -8,7 +8,7 @@
 #include <functional>   // std::reference_wrapper, std::ref
 
 #include "col_gridgen.h"
-#include "logger.h"
+#include <sweep/logger.h>
 
 //namespace dr = drjit; // For nanothread
 #define MIN_EDGE_LEN 1e-5

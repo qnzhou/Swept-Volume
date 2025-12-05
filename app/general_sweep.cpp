@@ -15,7 +15,8 @@
 #include <lagrange/topology.h>
 #include <lagrange/utils/SmallVector.h>
 
-#include <generalized_sweep/generalized_sweep.h>
+#include <sweep/generalized_sweep.h>
+#include <sweep/logger.h>
 
 
 //#include "init_grid.h"
@@ -307,19 +308,12 @@ int main(int argc, const char *argv[])
     if (!std::filesystem::exists(output_path)) {
         // Attempt to create the directory
         if (std::filesystem::create_directory(output_path)) {
-            std::cout << "Directory created successfully." << std::endl;
+            sweep::logger().info("Created output directory: {}", output_path);
         } else {
-            std::cerr << "Failed to create directory." << std::endl;
+            sweep::logger().error("Failed to create output directory: {}", output_path);
         }
     } else {
-        std::cout << "Directory already exists. Removing all contents..." << std::endl;
-        for (const auto& entry : std::filesystem::directory_iterator(output_path)) {
-            std::error_code ec;
-            std::filesystem::remove_all(entry.path(), ec);
-            if (ec) {
-                std::cerr << "Error removing " << entry.path() << ": " << ec.message() << std::endl;
-            }
-        }
+        sweep::logger().info("Output directory already exists: {}", output_path);
     }
 
     lagrange::io::save_mesh(output_path + "/envelope.msh", envelope);
@@ -334,8 +328,7 @@ int main(int argc, const char *argv[])
     auto saving_end = std::chrono::time_point_cast<std::chrono::microseconds>(
         std::chrono::high_resolution_clock::now()
     ).time_since_epoch().count();
-    std::cout << "Saving time: "
-        << (saving_end - saving_start) * 1e-6 << " seconds" << std::endl;
+    sweep::logger().info("Saving time: {} seconds", (saving_end - saving_start) * 1e-6);
 
     return 0;
 }

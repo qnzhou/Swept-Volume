@@ -1,4 +1,5 @@
-#include <generalized_sweep/generalized_sweep.h>
+#include <sweep/generalized_sweep.h>
+#include <sweep/logger.h>
 #include <mtet/grid.h>
 #include <mtetcol/contour.h>
 #include <mtetcol/simplicial_column.h>
@@ -11,7 +12,6 @@
 #include "adaptive_column_grid.h"
 #include "col_gridgen.h"
 #include "io.h"
-#include "logger.h"
 #include "post_processing.h"
 
 namespace sweep {

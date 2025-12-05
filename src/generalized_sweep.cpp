@@ -2,6 +2,7 @@
 #include <mtet/grid.h>
 #include <mtetcol/contour.h>
 #include <mtetcol/simplicial_column.h>
+#include <nanothread/nanothread.h>
 #include <sweep/generalized_sweep.h>
 #include <sweep/logger.h>
 
@@ -21,7 +22,7 @@ std::tuple<std::vector<Scalar>, std::vector<Index>,
            std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
 refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
             const SweepOptions& options) {
-    logger().info("Start to generate the background grid...");
+    logger().info("Adaptively refine the background grid...");
 
     // TODO: investigate why saving and loading is necessary here???
     mtet::save_mesh("init.msh", grid);
@@ -63,11 +64,12 @@ evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
 
     std::vector<mtetcol::Scalar> verts(num_vertices * 3);
     std::vector<mtetcol::Index> simps(num_tets * 4);
-    std::vector<std::vector<double>> time;
-    std::vector<std::vector<double>> values;
-
-    time.reserve(num_vertices * options.initial_time_samples);
-    values.reserve(num_vertices * options.initial_time_samples);
+    std::vector<std::vector<double>> time(num_vertices);
+    std::vector<std::vector<double>> values(num_vertices);
+    for (size_t i = 0; i < num_vertices; i++) {
+        time[i].reserve(options.initial_time_samples);
+        values[i].reserve(options.initial_time_samples);
+    }
 
     // Extract vertices
     ankerl::unordered_dense::map<uint64_t, Index> vertex_map;
@@ -93,18 +95,26 @@ evaluate_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     });
 
     // Extract time and time derivative
-    for (size_t vid = 0; vid < num_vertices; vid++) {
-        for (size_t tid = 0; tid < options.initial_time_samples; tid++) {
-            double t =
-                static_cast<double>(tid) / (options.initial_time_samples - 1);
-            Eigen::RowVector4d eval_point;
-            eval_point << verts[vid * 3 + 0], verts[vid * 3 + 1],
-                verts[vid * 3 + 2], t;
-            auto eval = f(eval_point);
-            time[vid].push_back(t);
-            values[vid].push_back(eval.second[3]);  // Value is time derivative.
-        }
-    }
+    namespace dr = drjit;
+    dr::parallel_for(
+        dr::blocked_range<size_t>(0, num_vertices, 1),
+        [&](dr::blocked_range<size_t> idx_range) {
+            for (size_t vid = idx_range.begin(); vid < idx_range.end(); vid++) {
+                for (size_t tid = 0; tid < options.initial_time_samples;
+                     tid++) {
+                    double t = static_cast<double>(tid) /
+                               (options.initial_time_samples - 1);
+                    Eigen::RowVector4d eval_point;
+                    eval_point << verts[vid * 3 + 0], verts[vid * 3 + 1],
+                        verts[vid * 3 + 2], t;
+                    auto eval = f(eval_point);
+                    time[vid].push_back(t);
+                    values[vid].push_back(
+                        eval.second[3]);  // Value is time derivative.
+                }
+            }
+        });
+
     return {verts, simps, time, values};
 }
 

@@ -52,6 +52,8 @@ include(spdlog)
 include(arrangement)
 include(stf)
 include(lagrange)
+include(yaml-cpp)
+include(nanothread)
 
 # project library
 target_compile_options(mtetcol PRIVATE -Wno-shorten-64-to-32 -Wno-logical-op-parentheses)
@@ -76,6 +78,7 @@ target_link_libraries(sweep
         smallvector::smallvector
         spdlog::spdlog
         unordered_dense::unordered_dense
+        nanothread::nanothread
 )
 add_library(sweep::sweep ALIAS sweep)
 
@@ -94,6 +97,7 @@ target_link_libraries(general_sweep
         lagrange::core
         lagrange::io
         nlohmann_json::nlohmann_json
+        yaml-cpp::yaml-cpp
 )
 
 option(GEN_SWEEP_TESTS "general sweep unit tests" OFF)

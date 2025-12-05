@@ -112,7 +112,7 @@ struct SweepOptions {
     bool with_adaptive_refinement = true;
 
     /// Number of initial uniform time samples per spatial grid vertex.
-    bool initial_time_samples = 8;
+    size_t initial_time_samples = 8;
 };
 
 ///

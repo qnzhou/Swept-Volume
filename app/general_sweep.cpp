@@ -7,6 +7,8 @@
 #include <igl/signed_distance.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <filesystem>
+#include <yaml-cpp/yaml.h>
 
 #include <lagrange/io/save_mesh.h>
 #include <lagrange/mesh_cleanup/remove_degenerate_facets.h>
@@ -107,6 +109,7 @@ int main(int argc, const char *argv[])
     {
         std::string grid_file;
         std::string output_path;
+        std::string config_file = "";
         std::string function_file = "";
         double threshold = 0.0005;
         double traj_threshold = 0.005;
@@ -120,6 +123,7 @@ int main(int argc, const char *argv[])
     CLI::App app{"Generalized Swept Volume"};
     app.add_option("grid", args.grid_file, "Initial grid file")->required();
     app.add_option("output", args.output_path, "Output path")->required();
+    app.add_option("-c,--config", args.config_file, "Configuration file");
     app.add_option("-f,--function", args.function_file, "Implicit function file");
     app.add_option("--ee,--epsilon-env", args.threshold, "Envelope threshold");
     app.add_option("--es, --epsilon-sil", args.traj_threshold, "Silhouette threshold");
@@ -293,12 +297,107 @@ int main(int argc, const char *argv[])
     sweep::GridSpec grid_spec = load_grid_spec(args.grid_file);
 
     sweep::SweepOptions options;
-    options.epsilon_env = threshold;
-    options.epsilon_sil = traj_threshold;
-    options.max_split = max_splits;
-    options.with_insideness_check = insideness_check;
-    options.with_snapping = !args.without_snapping;
-    options.cyclic = args.cyclic;
+    if (args.config_file != "") {
+        std::filesystem::path config_file(args.config_file);
+        if (!std::filesystem::exists(config_file) || !std::filesystem::is_regular_file(config_file)) {
+            sweep::logger().warn("Configuration file does not exist: {}", args.config_file);
+        } else {
+            YAML::Node config = YAML::LoadFile(config_file);
+            if (config["grid"]) {
+                auto grid_config = config["grid"];
+                if (grid_config["resolution"]) {
+                    grid_spec.resolution = {
+                        grid_config["resolution"][0].as<size_t>(),
+                        grid_config["resolution"][1].as<size_t>(),
+                        grid_config["resolution"][2].as<size_t>()
+                    };
+                }
+                if (grid_config["bbox_min"]) {
+                    grid_spec.bbox_min = {
+                        grid_config["bbox_min"][0].as<float>(),
+                        grid_config["bbox_min"][1].as<float>(),
+                        grid_config["bbox_min"][2].as<float>()
+                    };
+                }
+                if (grid_config["bbox_max"]) {
+                    grid_spec.bbox_max = {
+                        grid_config["bbox_max"][0].as<float>(),
+                        grid_config["bbox_max"][1].as<float>(),
+                        grid_config["bbox_max"][2].as<float>()
+                    };
+                }
+            }
+            if (config["parameters"]) {
+                auto param_config = config["parameters"];
+                if (param_config["epsilon_env"]) {
+                    options.epsilon_env = param_config["epsilon_env"].as<double>();
+                }
+                if (param_config["epsilon_sil"]) {
+                    options.epsilon_sil = param_config["epsilon_sil"].as<double>();
+                }
+                if (param_config["max_split"]) {
+                    options.max_split = param_config["max_split"].as<int>();
+                }
+                if (param_config["with_insideness_check"]) {
+                    options.with_insideness_check = param_config["with_insideness_check"].as<bool>();
+                }
+                if (param_config["with_snapping"]) {
+                    options.with_snapping = param_config["with_snapping"].as<bool>();
+                }
+                if (param_config["cyclic"]) {
+                    options.cyclic = param_config["cyclic"].as<bool>();
+                }
+                if (param_config["volume_threshold"]) {
+                    options.volume_threshold = param_config["volume_threshold"].as<double>();
+                }
+                if (param_config["face_count_threshold"]) {
+                    options.face_count_threshold = param_config["face_count_threshold"].as<size_t>();
+                }
+                if (param_config["with_adaptive_refinement"]) {
+                    options.with_adaptive_refinement = param_config["with_adaptive_refinement"].as<bool>();
+                }
+                if (param_config["initial_time_samples"]) {
+                    options.initial_time_samples = param_config["initial_time_samples"].as<int>();
+                }
+            }
+        }
+    } else {
+        // Extracting options from command line arguments
+        options.epsilon_env = threshold;
+        options.epsilon_sil = traj_threshold;
+        options.max_split = max_splits;
+        options.with_insideness_check = insideness_check;
+        options.with_snapping = !args.without_snapping;
+        options.cyclic = args.cyclic;
+    }
+
+    {
+        sweep::logger().info("=== Generalized Sweep Parameters ===");
+        sweep::logger().info("Grid resolution: {} x {} x {}",
+                             grid_spec.resolution[0],
+                             grid_spec.resolution[1],
+                             grid_spec.resolution[2]);
+        sweep::logger().info("Grid bbox min: ({}, {}, {})",
+                                grid_spec.bbox_min[0],
+                                grid_spec.bbox_min[1],
+                                grid_spec.bbox_min[2]);
+        sweep::logger().info("Grid bbox max: ({}, {}, {})",
+                                grid_spec.bbox_max[0],
+                                grid_spec.bbox_max[1],
+                                grid_spec.bbox_max[2]);
+        sweep::logger().info("Envelope epsilon: {}", options.epsilon_env);
+        sweep::logger().info("Silhouette epsilon: {}", options.epsilon_sil);
+        sweep::logger().info("Max splits: {}", options.max_split);
+        sweep::logger().info("Insideness check: {}", options.with_insideness_check);
+        sweep::logger().info("Vertex snapping: {}", options.with_snapping);
+        sweep::logger().info("Cyclic trajectory: {}", options.cyclic);
+        sweep::logger().info("Volume threshold: {}", options.volume_threshold);
+        sweep::logger().info("Face count threshold: {}", options.face_count_threshold);
+        sweep::logger().info("Adaptive refinement: {}", options.with_adaptive_refinement);
+        sweep::logger().info("Initial time samples: {}", options.initial_time_samples);
+        sweep::logger().info("=====================================");
+    }
+
     auto result = sweep::generalized_sweep(implicit_sweep, grid_spec, options);
     auto& envelope = result.envelope;
     auto& sweep_surface = result.sweep_surface;

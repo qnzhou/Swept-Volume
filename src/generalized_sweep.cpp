@@ -152,8 +152,35 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
     return envelope;
 }
 
+void log_config(const GridSpec& grid_spec, const SweepOptions& options) {
+    sweep::logger().info("=== Generalized Sweep Parameters ===");
+    sweep::logger().info("Grid resolution: {} x {} x {}",
+                         grid_spec.resolution[0], grid_spec.resolution[1],
+                         grid_spec.resolution[2]);
+    sweep::logger().info("Grid bbox min: ({}, {}, {})", grid_spec.bbox_min[0],
+                         grid_spec.bbox_min[1], grid_spec.bbox_min[2]);
+    sweep::logger().info("Grid bbox max: ({}, {}, {})", grid_spec.bbox_max[0],
+                         grid_spec.bbox_max[1], grid_spec.bbox_max[2]);
+    sweep::logger().info("Envelope epsilon: {}", options.epsilon_env);
+    sweep::logger().info("Silhouette epsilon: {}", options.epsilon_sil);
+    sweep::logger().info("Max splits: {}", options.max_split);
+    sweep::logger().info("Insideness check: {}", options.with_insideness_check);
+    sweep::logger().info("Vertex snapping: {}", options.with_snapping);
+    sweep::logger().info("Cyclic trajectory: {}", options.cyclic);
+    sweep::logger().info("Volume threshold: {}", options.volume_threshold);
+    sweep::logger().info("Face count threshold: {}",
+                         options.face_count_threshold);
+    sweep::logger().info("Adaptive refinement: {}",
+                         options.with_adaptive_refinement);
+    sweep::logger().info("Initial time samples: {}",
+                         options.initial_time_samples);
+    sweep::logger().info("=====================================");
+}
+
 SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
                               SweepOptions options) {
+    log_config(grid_spec, options);
+
     auto init_grid_start = std::chrono::high_resolution_clock::now();
     SweepResult result;
     auto grid = mtet::generate_tet_grid(grid_spec.resolution,

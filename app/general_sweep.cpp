@@ -103,6 +103,74 @@ void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Inde
     }
 }
 
+void load_config(std::string config_file, sweep::GridSpec& grid_spec, sweep::SweepOptions& options)
+{
+    std::filesystem::path config_path(config_file);
+    if (!std::filesystem::exists(config_path) || !std::filesystem::is_regular_file(config_path)) {
+        sweep::logger().warn("Configuration file does not exist: {}", config_file);
+        return;
+    }
+
+    YAML::Node config = YAML::LoadFile(config_path);
+    if (config["grid"]) {
+        auto grid_config = config["grid"];
+        if (grid_config["resolution"]) {
+            grid_spec.resolution = {
+                grid_config["resolution"][0].as<size_t>(),
+                grid_config["resolution"][1].as<size_t>(),
+                grid_config["resolution"][2].as<size_t>()
+            };
+        }
+        if (grid_config["bbox_min"]) {
+            grid_spec.bbox_min = {
+                grid_config["bbox_min"][0].as<float>(),
+                grid_config["bbox_min"][1].as<float>(),
+                grid_config["bbox_min"][2].as<float>()
+            };
+        }
+        if (grid_config["bbox_max"]) {
+            grid_spec.bbox_max = {
+                grid_config["bbox_max"][0].as<float>(),
+                grid_config["bbox_max"][1].as<float>(),
+                grid_config["bbox_max"][2].as<float>()
+            };
+        }
+    }
+    if (config["parameters"]) {
+                auto param_config = config["parameters"];
+                if (param_config["epsilon_env"]) {
+                    options.epsilon_env = param_config["epsilon_env"].as<double>();
+                }
+                if (param_config["epsilon_sil"]) {
+                    options.epsilon_sil = param_config["epsilon_sil"].as<double>();
+                }
+                if (param_config["max_split"]) {
+                    options.max_split = param_config["max_split"].as<int>();
+                }
+                if (param_config["with_insideness_check"]) {
+                    options.with_insideness_check = param_config["with_insideness_check"].as<bool>();
+                }
+                if (param_config["with_snapping"]) {
+                    options.with_snapping = param_config["with_snapping"].as<bool>();
+                }
+                if (param_config["cyclic"]) {
+                    options.cyclic = param_config["cyclic"].as<bool>();
+                }
+                if (param_config["volume_threshold"]) {
+                    options.volume_threshold = param_config["volume_threshold"].as<double>();
+                }
+                if (param_config["face_count_threshold"]) {
+                    options.face_count_threshold = param_config["face_count_threshold"].as<size_t>();
+                }
+                if (param_config["with_adaptive_refinement"]) {
+                    options.with_adaptive_refinement = param_config["with_adaptive_refinement"].as<bool>();
+                }
+                if (param_config["initial_time_samples"]) {
+                    options.initial_time_samples = param_config["initial_time_samples"].as<int>();
+                }
+    }
+}
+
 int main(int argc, const char *argv[])
 {
     struct
@@ -298,69 +366,7 @@ int main(int argc, const char *argv[])
 
     sweep::SweepOptions options;
     if (args.config_file != "") {
-        std::filesystem::path config_file(args.config_file);
-        if (!std::filesystem::exists(config_file) || !std::filesystem::is_regular_file(config_file)) {
-            sweep::logger().warn("Configuration file does not exist: {}", args.config_file);
-        } else {
-            YAML::Node config = YAML::LoadFile(config_file);
-            if (config["grid"]) {
-                auto grid_config = config["grid"];
-                if (grid_config["resolution"]) {
-                    grid_spec.resolution = {
-                        grid_config["resolution"][0].as<size_t>(),
-                        grid_config["resolution"][1].as<size_t>(),
-                        grid_config["resolution"][2].as<size_t>()
-                    };
-                }
-                if (grid_config["bbox_min"]) {
-                    grid_spec.bbox_min = {
-                        grid_config["bbox_min"][0].as<float>(),
-                        grid_config["bbox_min"][1].as<float>(),
-                        grid_config["bbox_min"][2].as<float>()
-                    };
-                }
-                if (grid_config["bbox_max"]) {
-                    grid_spec.bbox_max = {
-                        grid_config["bbox_max"][0].as<float>(),
-                        grid_config["bbox_max"][1].as<float>(),
-                        grid_config["bbox_max"][2].as<float>()
-                    };
-                }
-            }
-            if (config["parameters"]) {
-                auto param_config = config["parameters"];
-                if (param_config["epsilon_env"]) {
-                    options.epsilon_env = param_config["epsilon_env"].as<double>();
-                }
-                if (param_config["epsilon_sil"]) {
-                    options.epsilon_sil = param_config["epsilon_sil"].as<double>();
-                }
-                if (param_config["max_split"]) {
-                    options.max_split = param_config["max_split"].as<int>();
-                }
-                if (param_config["with_insideness_check"]) {
-                    options.with_insideness_check = param_config["with_insideness_check"].as<bool>();
-                }
-                if (param_config["with_snapping"]) {
-                    options.with_snapping = param_config["with_snapping"].as<bool>();
-                }
-                if (param_config["cyclic"]) {
-                    options.cyclic = param_config["cyclic"].as<bool>();
-                }
-                if (param_config["volume_threshold"]) {
-                    options.volume_threshold = param_config["volume_threshold"].as<double>();
-                }
-                if (param_config["face_count_threshold"]) {
-                    options.face_count_threshold = param_config["face_count_threshold"].as<size_t>();
-                }
-                if (param_config["with_adaptive_refinement"]) {
-                    options.with_adaptive_refinement = param_config["with_adaptive_refinement"].as<bool>();
-                }
-                if (param_config["initial_time_samples"]) {
-                    options.initial_time_samples = param_config["initial_time_samples"].as<int>();
-                }
-            }
-        }
+        load_config(args.config_file, grid_spec, options);
     } else {
         // Extracting options from command line arguments
         options.epsilon_env = threshold;
@@ -369,33 +375,6 @@ int main(int argc, const char *argv[])
         options.with_insideness_check = insideness_check;
         options.with_snapping = !args.without_snapping;
         options.cyclic = args.cyclic;
-    }
-
-    {
-        sweep::logger().info("=== Generalized Sweep Parameters ===");
-        sweep::logger().info("Grid resolution: {} x {} x {}",
-                             grid_spec.resolution[0],
-                             grid_spec.resolution[1],
-                             grid_spec.resolution[2]);
-        sweep::logger().info("Grid bbox min: ({}, {}, {})",
-                                grid_spec.bbox_min[0],
-                                grid_spec.bbox_min[1],
-                                grid_spec.bbox_min[2]);
-        sweep::logger().info("Grid bbox max: ({}, {}, {})",
-                                grid_spec.bbox_max[0],
-                                grid_spec.bbox_max[1],
-                                grid_spec.bbox_max[2]);
-        sweep::logger().info("Envelope epsilon: {}", options.epsilon_env);
-        sweep::logger().info("Silhouette epsilon: {}", options.epsilon_sil);
-        sweep::logger().info("Max splits: {}", options.max_split);
-        sweep::logger().info("Insideness check: {}", options.with_insideness_check);
-        sweep::logger().info("Vertex snapping: {}", options.with_snapping);
-        sweep::logger().info("Cyclic trajectory: {}", options.cyclic);
-        sweep::logger().info("Volume threshold: {}", options.volume_threshold);
-        sweep::logger().info("Face count threshold: {}", options.face_count_threshold);
-        sweep::logger().info("Adaptive refinement: {}", options.with_adaptive_refinement);
-        sweep::logger().info("Initial time samples: {}", options.initial_time_samples);
-        sweep::logger().info("=====================================");
     }
 
     auto result = sweep::generalized_sweep(implicit_sweep, grid_spec, options);

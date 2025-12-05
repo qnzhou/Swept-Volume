@@ -4,12 +4,14 @@
 #include <mtetcol/simplicial_column.h>
 
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <vector>
 
 #include "adaptive_column_grid.h"
 #include "col_gridgen.h"
 #include "io.h"
+#include "logger.h"
 #include "post_processing.h"
 
 namespace sweep {
@@ -18,7 +20,7 @@ std::tuple<std::vector<Scalar>, std::vector<Index>,
            std::vector<std::vector<Scalar>>, std::vector<std::vector<Scalar>>>
 refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
             const SweepOptions& options) {
-    std::cout << "Start to generate the background grid..." << std::endl;
+    logger().info("Start to generate the background grid...");
 
     vertExtrude vertexMap;
     insidenessMap insideMap;
@@ -83,14 +85,26 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope(
 
 SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
                               SweepOptions options) {
+    auto init_grid_start = std::chrono::high_resolution_clock::now();
     SweepResult result;
     auto grid = mtet::generate_tet_grid(grid_spec.resolution,
                                         grid_spec.bbox_min, grid_spec.bbox_max);
+    auto init_grid_end = std::chrono::high_resolution_clock::now();
+    logger().info(
+        "Initial grid generation time: {} seconds",
+        std::chrono::duration<double>(init_grid_end - init_grid_start).count());
+
     // TODO: investigate why saving and loading is necessary here???
     mtet::save_mesh("init.msh", grid);
     grid = mtet::load_mesh("init.msh");
 
+    auto refine_start = std::chrono::high_resolution_clock::now();
     auto [verts, simps, time, values] = refine_grid(f, grid, options);
+    auto refine_end = std::chrono::high_resolution_clock::now();
+    logger().info(
+        "Grid refinement time: {} seconds",
+        std::chrono::duration<double>(refine_end - refine_start).count());
+
     std::function<std::span<double>(size_t)> time_func =
         [&](size_t index) -> std::span<double> { return time[index]; };
     std::function<std::span<double>(size_t)> values_func =
@@ -101,18 +115,44 @@ SweepResult generalized_sweep(const SpaceTimeFunction& f, GridSpec grid_spec,
     columns.set_time_samples(time_func, values_func);
 
     constexpr Scalar iso_value = 0.0;
+
+    auto silhouette_start = std::chrono::high_resolution_clock::now();
     auto contour = columns.extract_contour(iso_value, options.cyclic);
+    auto silhouette_end = std::chrono::high_resolution_clock::now();
+    logger().info(
+        "Silhouette extraction time: {} seconds",
+        std::chrono::duration<double>(silhouette_end - silhouette_start)
+            .count());
+
     if (!contour.is_manifold()) {
         throw std::runtime_error("ERROR: extracted contour is not manifold");
     }
 
+    auto envelope_start = std::chrono::high_resolution_clock::now();
     result.envelope = compute_envelope(f, contour, options);
+    auto envelope_end = std::chrono::high_resolution_clock::now();
+    logger().info(
+        "Envelope computation time: {} seconds",
+        std::chrono::duration<double>(envelope_end - envelope_start).count());
 
-    result.arrangement = compute_envelope_arrangement(
-        result.envelope, options.volume_threshold, options.face_count_threshold);
+    auto arrangement_start = std::chrono::high_resolution_clock::now();
+    result.arrangement =
+        compute_envelope_arrangement(result.envelope, options.volume_threshold,
+                                     options.face_count_threshold);
+    auto arrangement_end = std::chrono::high_resolution_clock::now();
+    logger().info(
+        "Arrangement computation time: {} seconds",
+        std::chrono::duration<double>(arrangement_end - arrangement_start)
+            .count());
 
+    auto sweep_surface_start = std::chrono::high_resolution_clock::now();
     result.sweep_surface =
         extract_sweep_surface_from_arrangement(result.arrangement);
+    auto sweep_surface_end = std::chrono::high_resolution_clock::now();
+    logger().info(
+        "Sweep surface extraction time: {} seconds",
+        std::chrono::duration<double>(sweep_surface_end - sweep_surface_start)
+            .count());
 
     return result;
 }

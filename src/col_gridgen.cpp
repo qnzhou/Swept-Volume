@@ -8,6 +8,7 @@
 #include <functional>   // std::reference_wrapper, std::ref
 
 #include "col_gridgen.h"
+#include "logger.h"
 
 //namespace dr = drjit; // For nanothread
 #define MIN_EDGE_LEN 1e-5
@@ -878,6 +879,7 @@ bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &ins
 #endif
         }
     }
-    std::cout << "Temporal splits: " << temporal_splits << " Spatial splits " << spatial_splits << " Minimum tet radius ratio: " << min_tet_ratio << std::endl;
+    sweep::logger().info("Total splits: {}  Spatial splits: {}  Minimum tet radius ratio: {}",
+            splits, spatial_splits, min_tet_ratio);
     return true;
 }

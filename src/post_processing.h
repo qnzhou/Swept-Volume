@@ -41,10 +41,6 @@ lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
         time_values[i] = xyzt[3];
     }
 
-    ankerl::unordered_dense::map<std::pair<mtetcol::Index, mtetcol::Index>,
-                                 std::vector<size_t>>
-        edge_valence_map;
-
     // Add polygons
     lagrange::SmallVector<uint32_t, 16> polygon;
     for (size_t i = 0; i < num_cycles; i++) {
@@ -61,11 +57,6 @@ lagrange::SurfaceMesh<Scalar, Index> isocontour_to_mesh(
             polygon[ind] = (seg_ori ? seg[0] : seg[1]);
             std::pair<mtetcol::Index, mtetcol::Index> edge_key = {
                 std::min(seg[0], seg[1]), std::max(seg[0], seg[1])};
-
-            if (edge_valence_map.find(edge_key) == edge_valence_map.end()) {
-                edge_valence_map[edge_key] = {};
-            }
-            edge_valence_map[edge_key].push_back(i);
 
             ind++;
         }

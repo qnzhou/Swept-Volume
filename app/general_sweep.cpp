@@ -37,7 +37,9 @@ void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Inde
         throw std::runtime_error("Failed to open file: " + std::string(filename));
     }
 
-    assert(arrangement.has_attribute("is_feature"));
+    if (!arrangement.has_attribute("is_feature")) {
+        throw std::runtime_error("Arrangement mesh does not have 'is_feature' attribute.");
+    }
     auto vertex_view = lagrange::vertex_view(arrangement);
     Index num_vertices = arrangement.get_num_vertices();
     for (Index vid=0; vid < num_vertices; vid++) {
@@ -266,7 +268,9 @@ int main(int argc, const char *argv[])
                 data["resolution"][2].get<size_t>()
             };
         } else {
-            assert(data["resolution"].size() == 1);
+            if (data["resolution"].size() != 1) {
+                throw std::runtime_error("resolution should have size 1 or 3!");
+            }
             size_t res = data["resolution"][0].get<size_t>();
             grid_spec.resolution = {res, res, res};
         }

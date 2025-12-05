@@ -2,11 +2,11 @@ if(TARGET nanothread::nanothread)
     return()
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-  nanothread
-  GIT_REPOSITORY https://github.com/mitsuba-renderer/nanothread.git
-  GIT_TAG 9073b959f02da3395cdae8ed7e0e0f86b1c2ddb8
+include(CPM)
+CPMAddPackage(
+  NAME nanothread
+  GITHUB_REPOSITORY mitsuba-renderer/nanothread
+  GIT_TAG 5d354917ea574488d133d242eda1a365a70b80e9
 )
-FetchContent_MakeAvailable(nanothread)
+
 add_library(nanothread::nanothread ALIAS nanothread)

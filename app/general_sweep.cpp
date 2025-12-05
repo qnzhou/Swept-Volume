@@ -227,6 +227,17 @@ int main(int argc, const char* argv[])
                 gradient(3) = (-s) * cp.dot(point_velocity);
                 return {value, gradient};
             };
+        } else if (
+            std::filesystem::exists(args.function_file) &&
+            std::filesystem::is_regular_file(args.function_file)) {
+            std::shared_ptr<stf::SpaceTimeFunction<3>> func =
+                stf::parse_space_time_function_from_file<3>(args.function_file);
+            implicit_sweep = [f = std::move(func)](
+                                 Eigen::RowVector4d data) -> std::pair<Scalar, Eigen::RowVector4d> {
+                auto val = f->value({data[0], data[1], data[2]}, data[3]);
+                auto grad = f->gradient({data[0], data[1], data[2]}, data[3]);
+                return {val, {grad[0], grad[1], grad[2], grad[3]}};
+            };
         } else if (args.function_file == "elbow") {
             implicit_sweep = elbow;
         } else if (args.function_file == "bezier") {

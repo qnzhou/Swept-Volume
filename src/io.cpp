@@ -5,6 +5,7 @@
 //  Created by Yiwen Ju on 12/3/24.
 //
 #include "io.h"
+#include <sweep/logger.h>
 
 
 void convert_4d_grid_col(mtet::MTetMesh grid,
@@ -96,7 +97,7 @@ void convert_4d_grid_mtetcol(mtet::MTetMesh grid,
         tet4d_num += vertexMap[value_of(vs[3])].vert4dList.size();
         tet4d_num -= 4;
     });
-    std::cout << "4D Vertex Number: " << vert4d_num << " 4D Tetrahedra Number: " << tet4d_num << std::endl;
+    sweep::logger().info("4D Vertex Number: {} 4D Tetrahedra Number: {}", vert4d_num, tet4d_num);
 }
 mshio::MshSpec generate_spec(
                              const Eigen::MatrixXd& V,

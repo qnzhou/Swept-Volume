@@ -192,6 +192,12 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
 
     std::vector<int> parent_cell(num_cells);
     std::iota(parent_cell.begin(), parent_cell.end(), 0);
+    auto get_parent = [&](auto&& self, int cid) -> int {
+        if (parent_cell[cid] != cid) {
+            parent_cell[cid] = self(self, parent_cell[cid]);
+        }
+        return parent_cell[cid];
+    };
     for (size_t cid = 0; cid < num_cells; cid++) {
         if (cell_is_small(cid)) {
             // Union small cell with one of its neighbors
@@ -203,15 +209,9 @@ lagrange::SurfaceMesh<Scalar, Index> compute_envelope_arrangement(
                     parent = adj_cid;
                 }
             }
-            parent_cell[cid] = parent;
+            parent_cell[cid] = get_parent(get_parent, parent);
         }
     }
-    auto get_parent = [&](auto&& self, int cid) -> int {
-        if (parent_cell[cid] != cid) {
-            parent_cell[cid] = self(self, parent_cell[cid]);
-        }
-        return parent_cell[cid];
-    };
 
     // Compute sweep surface facets
     sweep_arrangement.template create_attribute<int8_t>(

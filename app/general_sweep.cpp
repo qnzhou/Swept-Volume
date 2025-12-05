@@ -19,55 +19,11 @@
 #include <queue>
 #include <span>
 
-// #include "init_grid.h"
-// #include "io.h"
-// #include "col_gridgen.h"
 #include "trajectory.h"
-// #include "post_processing.h"
-// #include "timer.h"
 
 #define SAVE_CONTOUR 0
 #define batch_stats 0
 #define batch_time 0
-
-sweep::GridSpec load_grid_spec(const std::string& grid_file)
-{
-    sweep::GridSpec grid_spec;
-
-    using json = nlohmann::json;
-    std::ifstream fin(grid_file.c_str());
-    if (!fin) {
-        throw std::runtime_error("Grid file does not exist!");
-    }
-    json data;
-    fin >> data;
-    fin.close();
-    if (!data.contains("resolution") || !data.contains("bbox_min") || !data.contains("bbox_max")) {
-        throw std::runtime_error("grid specification missing in json file!");
-    }
-    if (data["resolution"].size() == 3) {
-        grid_spec.resolution = {
-            data["resolution"][0].get<size_t>(),
-            data["resolution"][1].get<size_t>(),
-            data["resolution"][2].get<size_t>()};
-    } else {
-        if (data["resolution"].size() != 1) {
-            throw std::runtime_error("resolution should have size 1 or 3!");
-        }
-        size_t res = data["resolution"][0].get<size_t>();
-        grid_spec.resolution = {res, res, res};
-    }
-    grid_spec.bbox_min = {
-        data["bbox_min"][0].get<float>(),
-        data["bbox_min"][1].get<float>(),
-        data["bbox_min"][2].get<float>()};
-    grid_spec.bbox_max = {
-        data["bbox_max"][0].get<float>(),
-        data["bbox_max"][1].get<float>(),
-        data["bbox_max"][2].get<float>()};
-
-    return grid_spec;
-}
 
 template <typename Scalar, typename Index>
 void save_features(std::string_view filename, lagrange::SurfaceMesh<Scalar, Index>& arrangement)
@@ -172,7 +128,6 @@ int main(int argc, const char* argv[])
 {
     struct
     {
-        std::string grid_file;
         std::string output_path;
         std::string config_file = "";
         std::string function_file = "";
@@ -186,7 +141,6 @@ int main(int argc, const char* argv[])
         bool cyclic = false;
     } args;
     CLI::App app{"Generalized Swept Volume"};
-    app.add_option("grid", args.grid_file, "Initial grid file")->required();
     app.add_option("output", args.output_path, "Output path")->required();
     app.add_option("-c,--config", args.config_file, "Configuration file");
     app.add_option("-f,--function", args.function_file, "Implicit function file");
@@ -367,9 +321,9 @@ int main(int argc, const char* argv[])
         implicit_sweep = [&](Eigen::RowVector4d data) { return flippingDonutFullTurn(data); };
     }
 
-    sweep::GridSpec grid_spec = load_grid_spec(args.grid_file);
-
+    sweep::GridSpec grid_spec;
     sweep::SweepOptions options;
+
     if (args.config_file != "") {
         load_config(args.config_file, grid_spec, options);
     } else {

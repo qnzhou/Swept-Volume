@@ -24,6 +24,8 @@
 /// @param[in] max_splits           Max number of splits of the grid
 /// @param[in] insideness_check         Whether to enable the refinement for regions inside the sweep boundary
 /// @param[out] profileTimer            The time profiler. Details can be found in `timer.h`
+/// @param[out] profileCount            The count profiler. Details can be found in `timer.h`
+/// @param[in] initial_time_samples         Initial number of time samples at each vertex. It will be rounded up to the next power of 2.
 bool gridRefine(mtet::MTetMesh &grid,
                 vertExtrude &vertexMap,
                 insidenessMap &insideMap,
@@ -33,6 +35,7 @@ bool gridRefine(mtet::MTetMesh &grid,
                 const int max_splits,
                 const int insideness_check,
                 std::array<double, timer_amount>& profileTimer,
-                std::array<size_t, timer_amount>& profileCount);
+                std::array<size_t, timer_amount>& profileCount,
+                size_t initial_time_samples);
 
 #endif /* col_gridgen_h */

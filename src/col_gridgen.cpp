@@ -190,14 +190,21 @@ llvm_vecsmall::SmallVector<size_t, 256> resampleTimeCol
     return refineList;
 }
 
-/// @param[in] timeDep: depth of time intervals; exponential increase
+/// @param[in] initial_time_samples: initial number of time samples at each vertex. It will be
+/// rounded up to the next power of 2.
 /// @param[in] grid: base 3D grid. For each vertex, build a list of time stamps. For each tet, build a list of extruded 4D simplices
 /// @param[in] func: the implicit function that represents the swept volume. The input of the function is the 4d coordinate, and the output is an size-4 vector with first entry as the value and the other three as the gradient.
 /// @param[in] maxTimeDep: maximum interger-valued time depth of the trajectory. Default: 1024
 ///
 /// @param[out] timeList: a list of time stamps at this vertex
-void init5CGrid(const int timeDep, mtet::MTetMesh grid, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const int maxTimeDep, vertExtrude &vertexMap){
-    int timeLen = pow(2, timeDep - 1);
+void init5CGrid(const size_t initial_time_sampels, mtet::MTetMesh grid, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const int maxTimeDep, vertExtrude &vertexMap){
+    int timeLen = 1;
+    // Determine time length as power of 2
+    while(timeLen < initial_time_sampels){
+        timeLen <<= 1;
+    }
+    assert(timeLen > 0);
+
     int len = maxTimeDep / timeLen;
     vertexCol::time_list time3DList(timeLen + 1);
     for (int i = 0; i < timeLen+1; i++){
@@ -312,8 +319,8 @@ std::vector<uint32_t> one_column_simp = {0, 1, 2, 3};
 
 ///see descriptions in header
 bool gridRefine(mtet::MTetMesh &grid, vertExtrude &vertexMap, insidenessMap &insideMap, const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func, const double threshold, const double traj_threshold, const int max_splits,
-                const int insideness_check, std::array<double, timer_amount>& profileTimer, std::array<size_t, timer_amount>& profileCount){
-    init5CGrid(3, grid, func, MAX_TIME, vertexMap);
+                const int insideness_check, std::array<double, timer_amount>& profileTimer, std::array<size_t, timer_amount>& profileCount, size_t initial_time_samples){
+    init5CGrid(initial_time_samples, grid, func, MAX_TIME, vertexMap);
     double min_tet_ratio = 1.0;
     ///
     /// Initiate queue: timeQ and spaceQ

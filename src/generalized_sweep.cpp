@@ -39,7 +39,7 @@ refine_grid(const SpaceTimeFunction& f, mtet::MTetMesh& grid,
     if (!gridRefine(grid, vertexMap, insideMap, f, options.epsilon_env,
                     options.epsilon_sil, options.max_split,
                     options.with_insideness_check, profileTimer,
-                    profileCount)) {
+                    profileCount, options.initial_time_samples)) {
         throw std::runtime_error("ERROR: grid generation failed");
     };
     spdlog::set_level(spdlog::level::info);

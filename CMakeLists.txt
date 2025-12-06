@@ -83,13 +83,13 @@ target_link_libraries(sweep
 add_library(sweep::sweep ALIAS sweep)
 
 file(GLOB SWEEP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/app/include/*.h)
-add_executable(general_sweep "app/general_sweep.cpp")
+add_executable(generalized_sweep "app/generalized_sweep.cpp")
 
-target_compile_features(general_sweep PRIVATE cxx_std_17)
-target_compile_definitions(general_sweep PRIVATE -DDATA_DIR="${CMAKE_CURRENT_LIST_DIR}/data")
-target_include_directories(general_sweep PRIVATE ${CMAKE_CURRENT_LIST_DIR}/app/include)
-target_sources(general_sweep PRIVATE ${SWEEP_HEADERS})
-target_link_libraries(general_sweep
+target_compile_features(generalized_sweep PRIVATE cxx_std_17)
+target_compile_definitions(generalized_sweep PRIVATE -DDATA_DIR="${CMAKE_CURRENT_LIST_DIR}/data")
+target_include_directories(generalized_sweep PRIVATE ${CMAKE_CURRENT_LIST_DIR}/app/include)
+target_sources(generalized_sweep PRIVATE ${SWEEP_HEADERS})
+target_link_libraries(generalized_sweep
     PRIVATE
         sweep::sweep
         CLI11::CLI11

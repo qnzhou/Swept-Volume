@@ -10,6 +10,8 @@ Given any sweep represented as a smooth time-varying implicit function satisfyin
 
 ## Build
 
+### C++ Build
+
 Use the following command to build: 
 
 ```bash
@@ -20,11 +22,58 @@ make
 ```
 The program `general_sweep` will be generated in the build file. 
 
+### Python Bindings
+
+Python bindings are available for easy integration with Python workflows:
+
+```bash
+# Install the Python package
+pip install .
+
+# Or install in development mode
+pip install -e .
+
+# Quick build script
+./build_python.sh
+```
+
+See [`python/README.md`](python/README.md) for detailed Python API documentation and examples.
+
 ### Dependency
 
 Currently, all third-party libraries are now open-sourced.
 
 ## Usage
+
+### Python API
+
+For Python users, the library provides a simple API:
+
+```python
+import numpy as np
+from sweep3d import GridSpec, SweepOptions, generalized_sweep
+
+def my_space_time_function(point_4d):
+    """Define a space-time implicit function."""
+    x, y, z, t = point_4d
+    # Example: static sphere
+    value = 0.5**2 - (x**2 + y**2 + z**2)
+    gradient = np.array([-2*x, -2*y, -2*z, 0.0])
+    return (value, gradient)
+
+# Configure and compute
+grid_spec = GridSpec()
+grid_spec.resolution = [8, 8, 8]
+options = SweepOptions()
+result = generalized_sweep(my_space_time_function, grid_spec, options)
+
+# Access results
+print(f"Sweep surface: {result.sweep_surface.num_vertices()} vertices")
+```
+
+See [`python/example.py`](python/example.py) for a complete working example and [`python/README.md`](python/README.md) for detailed API documentation.
+
+### Command Line Tool
 
 To use the `general_sweep` tool, you must provide an initial grid file and output path as required arguments, along with any desired options. The trajectory functions are defined in `trajectory.h`. 
 

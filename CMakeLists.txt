@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
+option(SWEEP_PYTHON_BINDING "Build python binding" OFF)
+
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0.0")
     message(WARNING "CMake version is ${CMAKE_VERSION}, setting stuff for dependencies.")
     SET(CMAKE_POLICY_VERSION_MINIMUM ${REQUIRED_CMAKE_VERSION})
@@ -79,6 +81,8 @@ target_link_libraries(sweep
         spdlog::spdlog
         unordered_dense::unordered_dense
         nanothread::nanothread
+        yaml-cpp::yaml-cpp
+        stf::stf
 )
 add_library(sweep::sweep ALIAS sweep)
 
@@ -124,4 +128,25 @@ target_compile_definitions(
     -DTEST_FILE="${CMAKE_CURRENT_LIST_DIR}/data"
 )
  catch_discover_tests(sweep_volume_test)
+endif()
+
+if (SWEEP_PYTHON_BINDING)
+    if(SKBUILD)
+        if(APPLE)
+            set(CMAKE_INSTALL_RPATH @loader_path)
+        elseif(UNIX)
+            set(CMAKE_INSTALL_RPATH $ORIGIN)
+        endif()
+    endif()
+
+    include(nanobind)
+    set(PY_SRC_FILE ${CMAKE_CURRENT_LIST_DIR}/python/pysweep3d.cpp)
+    nanobind_add_module(pysweep3d NB_STATIC ${PY_SRC_FILE})
+    target_link_libraries(pysweep3d PRIVATE sweep::sweep nanothread::nanothread)
+    target_compile_features(pysweep3d PRIVATE cxx_std_20)
+    install(TARGETS pysweep3d nanothread LIBRARY
+        COMPONENT Sweep_Python_Runtime
+        DESTINATION ${SKBUILD_PLATLIB_DIR}/sweep3d
+    )
+    add_library(sweep::pysweep3d ALIAS pysweep3d)
 endif()

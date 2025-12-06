@@ -6,6 +6,7 @@
 #include <array>
 #include <functional>
 #include <limits>
+#include <filesystem>
 
 namespace sweep {
 
@@ -138,5 +139,18 @@ struct SweepOptions {
 SweepResult generalized_sweep(const SpaceTimeFunction& f,
                               GridSpec grid_spec = {},
                               SweepOptions options = {});
+
+///
+/// Compute the generalized sweep surface from configuration files.
+///
+/// @param function_file  Path to the file defining the space-time implicit function.
+/// @param config_file    Path to the configuration file specifying grid and sweep options.
+///
+/// @return               The result of the generalized sweep, including the envelope mesh,
+///                       the arrangement mesh, and the final sweep surface.
+///
+SweepResult generalized_sweep_from_config(
+        std::filesystem::path function_file,
+        std::filesystem::path config_file);
 
 };  // namespace sweep

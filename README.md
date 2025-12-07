@@ -47,16 +47,19 @@ Currently, all third-party libraries are now open-sourced.
 
 ### Python API
 
-For Python users, the library provides a simple API:
-
 ```python
 import numpy as np
 from sweep3d import GridSpec, SweepOptions, generalized_sweep
 
 def my_space_time_function(point_4d):
-    """Define a space-time implicit function."""
+    """Space-time implicit function.
+    
+    :param point_4d: 4D point [x, y, z, t] where t ∈ [0, 1]
+    :type point_4d: numpy.ndarray
+    :return: Tuple of (value, gradient)
+    :rtype: tuple(float, numpy.ndarray)
+    """
     x, y, z, t = point_4d
-    # Example: static sphere
     value = 0.5**2 - (x**2 + y**2 + z**2)
     gradient = np.array([-2*x, -2*y, -2*z, 0.0])
     return (value, gradient)
@@ -64,14 +67,11 @@ def my_space_time_function(point_4d):
 # Configure and compute
 grid_spec = GridSpec()
 grid_spec.resolution = [8, 8, 8]
-options = SweepOptions()
-result = generalized_sweep(my_space_time_function, grid_spec, options)
-
-# Access results
-print(f"Sweep surface: {result.sweep_surface.num_vertices()} vertices")
+result = generalized_sweep(my_space_time_function, grid_spec)
+print(f"Vertices: {result.sweep_surface.num_vertices()}")
 ```
 
-See [`python/example.py`](python/example.py) for a complete working example and [`python/README.md`](python/README.md) for detailed API documentation.
+See [`python/README.md`](python/README.md) for complete documentation.
 
 ### Command Line Tool
 

@@ -20,7 +20,7 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
-The program `general_sweep` will be generated in the build file. 
+The program `generalized_sweep` will be generated in the build file. 
 
 ### Python Bindings
 
@@ -75,10 +75,10 @@ See [`python/README.md`](python/README.md) for complete documentation.
 
 ### Command Line Tool
 
-To use the `general_sweep` tool, you must provide an initial grid file and output path as required arguments, along with any desired options. The trajectory functions are defined in `trajectory.h`. 
+To use the `generalized_sweep` tool, you must provide an initial grid file and output path as required arguments, along with any desired options. The trajectory functions are defined in `trajectory.h`. 
 
 ```bash
-./general_sweep <grid> <output> [OPTIONS]
+./generalized_sweep <grid> <output> [OPTIONS]
 ```
 
 
@@ -107,10 +107,10 @@ The input of this program is any generalized sweep that is represented by a smoo
 
 ## Example:
 
-The following is an example of how to use the `general_sweep` tool with common options:
+The following is an example of how to use the `generalized_sweep` tool with common options:
 
 ```bash
-./general_sweep ../data/test/grid_1.json ../output/brush_stroke_example --ee 0.0005 --es 0.005 -f brush_stroke_blending
+./generalized_sweep ../data/test/grid_1.json ../output/brush_stroke_example --ee 0.0005 --es 0.005 -f brush_stroke_blending
 ```
 
 ### Parameter Breakdown:

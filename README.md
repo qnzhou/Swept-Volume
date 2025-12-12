@@ -201,35 +201,7 @@ The `GridSpec` struct defines the initial spatial grid used for sweep computatio
 | `bbox_min` | `[float, float, float]` | `[-0.2, -0.2, -0.2]` | Minimum corner of the axis-aligned bounding box that encloses the sweep volume. |
 | `bbox_max` | `[float, float, float]` | `[1.2, 1.2, 1.2]` | Maximum corner of the axis-aligned bounding box that encloses the sweep volume. |
 
-### Example Usage
-
-C++:
-```c++
-sweep::GridSpec grid;
-grid.resolution = {8, 8, 8};
-grid.bbox_min = {-0.5, -0.5, -0.5};
-grid.bbox_max = {1.5, 1.5, 1.5};
-```
-
-Python:
-```python
-import sweep3d
-
-grid_spec = sweep3d.GridSpec()
-grid_spec.resolution = [8, 8, 8]
-grid_spec.bbox_min = [-0.5, -0.5, -0.5]
-grid_spec.bbox_max = [1.5, 1.5, 1.5]
-```
-
-YAML:
-```yaml
-grid:
-    resolution: [8, 8, 8]
-    bbox_min: [-0.5, -0.5, -0.5]
-    bbox_max: [1.5, 1.5, 1.5]
-```
-
-**Note:** The bounding box should be large enough to fully enclose the swept volume throughout the entire trajectory (t ∈ [0, 1]). The grid will be adaptively refined during computation based on the `SweepOptions`.
+**Note:** The bounding box should be large enough to fully enclose the swept volume throughout the entire trajectory (t ∈ [0, 1]).
 
 ## Sweep Options
 
@@ -267,33 +239,74 @@ The `SweepOptions` struct provides fine-grained control over the sweep computati
 |-----------|------|---------|-------------|
 | `cyclic` | `bool` | `false` | Whether the trajectory is cyclic. ⚠️ This feature is experimental and not fully supported. |
 
-### Example Usage
+## Configuration Examples
 
-C++:
+The following examples show how to configure both grid parameters and sweep options together:
+
+<details>
+<summary><b>C++ Example</b></summary>
+
 ```c++
+#include <sweep/generalized_sweep.h>
+
+// Configure grid
+sweep::GridSpec grid;
+grid.resolution = {8, 8, 8};
+grid.bbox_min = {-0.5, -0.5, -0.5};
+grid.bbox_max = {1.5, 1.5, 1.5};
+
+// Configure sweep options
 sweep::SweepOptions options;
 options.epsilon_env = 1e-3;
 options.epsilon_sil = 1e-3;
 options.with_insideness_check = false;
 options.max_split = 1000000;
+
+// Compute sweep
+auto result = sweep::generalized_sweep(f, grid, options);
 ```
 
-Python:
+</details>
+
+<details>
+<summary><b>Python Example</b></summary>
+
 ```python
 import sweep3d
 
+# Configure grid
+grid_spec = sweep3d.GridSpec()
+grid_spec.resolution = [8, 8, 8]
+grid_spec.bbox_min = [-0.5, -0.5, -0.5]
+grid_spec.bbox_max = [1.5, 1.5, 1.5]
+
+# Configure sweep options
 options = sweep3d.SweepOptions()
 options.epsilon_env = 1e-3
 options.epsilon_sil = 1e-3
 options.with_insideness_check = False
 options.max_split = 1000000
+
+# Compute sweep
+result = sweep3d.generalized_sweep(my_function, grid_spec, options)
 ```
 
-YAML:
+</details>
+
+<details>
+<summary><b>YAML Example</b></summary>
+
 ```yaml
+grid:
+    resolution: [8, 8, 8]
+    bbox_min: [-0.5, -0.5, -0.5]
+    bbox_max: [1.5, 1.5, 1.5]
+
 parameters:
     epsilon_env: 1e-3
     epsilon_sil: 1e-3
     with_insideness_check: false
     max_split: 1000000
 ```
+
+</details>

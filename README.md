@@ -49,7 +49,7 @@ For complete API documentation, please see [generalized_sweep.h](include/sweep/g
 The `generalized_sweep` function provides the most general API. It takes the following inputs
 
 * a user-provided space-time function for pointwise function and gradient evaluation,
-* (optional) a simple initial grid specification, and
+* (optional) a simple initial grid specification ([doc](#grid-parameters)), and
 * (optional) customized sweep parameters ([doc](#sweep-options))
 
 and generates the following outputs
@@ -188,6 +188,48 @@ print(f"Vertices: {result.sweep_surface.num_vertices()}")
 ```
 
 See [`python/README.md`](python/README.md) for complete documentation.
+
+## Grid Parameters
+
+The `GridSpec` struct defines the initial spatial grid used for sweep computation. The grid represents the 3D spatial domain (the time dimension is handled separately).
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `resolution` | `[int, int, int]` | `[4, 4, 4]` | Number of grid cells in the x, y, z directions. Higher resolution provides better initial sampling but increases computation time. |
+| `bbox_min` | `[float, float, float]` | `[-0.2, -0.2, -0.2]` | Minimum corner of the axis-aligned bounding box that encloses the sweep volume. |
+| `bbox_max` | `[float, float, float]` | `[1.2, 1.2, 1.2]` | Maximum corner of the axis-aligned bounding box that encloses the sweep volume. |
+
+### Example Usage
+
+C++:
+```c++
+sweep::GridSpec grid;
+grid.resolution = {8, 8, 8};
+grid.bbox_min = {-0.5, -0.5, -0.5};
+grid.bbox_max = {1.5, 1.5, 1.5};
+```
+
+Python:
+```python
+import sweep3d
+
+grid_spec = sweep3d.GridSpec()
+grid_spec.resolution = [8, 8, 8]
+grid_spec.bbox_min = [-0.5, -0.5, -0.5]
+grid_spec.bbox_max = [1.5, 1.5, 1.5]
+```
+
+YAML:
+```yaml
+grid:
+    resolution: [8, 8, 8]
+    bbox_min: [-0.5, -0.5, -0.5]
+    bbox_max: [1.5, 1.5, 1.5]
+```
+
+**Note:** The bounding box should be large enough to fully enclose the swept volume throughout the entire trajectory (t ∈ [0, 1]). The grid will be adaptively refined during computation based on the `SweepOptions`.
 
 ## Sweep Options
 

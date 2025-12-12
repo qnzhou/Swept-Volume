@@ -50,7 +50,7 @@ The `generalized_sweep` function provides the most general API. It takes the fol
 
 * a user-provided space-time function for pointwise function and gradient evaluation,
 * (optional) a simple initial grid specification, and
-* (optional) customized sweep parameters ([doc](#sweep_options))
+* (optional) customized sweep parameters ([doc](#sweep-options))
 
 and generates the following outputs
 
@@ -238,9 +238,9 @@ options.max_split = 1000000;
 
 Python:
 ```python
-from sweep3d import SweepOptions
+import sweep3d
 
-options = SweepOptions()
+options = sweep3d.SweepOptions()
 options.epsilon_env = 1e-3
 options.epsilon_sil = 1e-3
 options.with_insideness_check = False

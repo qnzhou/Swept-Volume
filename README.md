@@ -50,7 +50,7 @@ The `generalized_sweep` function provides the most general API. It takes the fol
 
 * a user-provided space-time function for pointwise function and gradient evaluation,
 * (optional) a simple initial grid specification, and
-* (optional) customized sweep parameters
+* (optional) customized sweep parameters ([doc](#sweep_options))
 
 and generates the following outputs
 
@@ -161,7 +161,6 @@ auto r = sweep::generalized_sweep_from_config(
 lagrange::io::save_mesh("sweep_surface.obj", r.sweep_surface);
 ```
 
-
 ### Python API
 
 ```python
@@ -189,3 +188,70 @@ print(f"Vertices: {result.sweep_surface.num_vertices()}")
 ```
 
 See [`python/README.md`](python/README.md) for complete documentation.
+
+## Sweep Options
+
+The `SweepOptions` struct provides fine-grained control over the sweep computation. All parameters are optional and have sensible defaults.
+
+### Refinement Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `epsilon_env` | `double` | `5e-4` | Tolerance for envelope grid refinement. Smaller values produce more accurate but denser results. |
+| `epsilon_sil` | `double` | `5e-3` | Tolerance for silhouette grid refinement. Controls the accuracy of feature detection. |
+| `max_split` | `int` | unlimited | Maximum number of splits allowed during grid refinement. Can be used to limit computation time. |
+| `with_adaptive_refinement` | `bool` | `true` | Adaptively refine the input grid based on the implicit function. |
+| `initial_time_samples` | `size_t` | `8` | Number of initial uniform time samples per spatial grid vertex. |
+
+### Quality Control Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_tet_radius_ratio` | `double` | `1e-5` | Minimum acceptable tetrahedron in-radius to circum-radius ratio during grid refinement. Tets below this threshold will not be refined further. |
+| `min_tet_edge_length` | `double` | `2e-5` | Minimum acceptable tetrahedron edge length during grid refinement. Tets with longest edge below this threshold will not be refined further. |
+
+### Surface Extraction Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `with_insideness_check` | `bool` | `true` | Whether to perform insideness checks during grid refinement. If true, the algorithm will stop refinement early once it detects a cell is inside the swept volume. |
+| `with_snapping` | `bool` | `true` | Whether to enable vertex snapping during isocontouring. Improves robustness of the mesh extraction. |
+| `volume_threshold` | `double` | `1e-5` | Minimum volume threshold for arrangement cell filtering. Cells below this volume will be merged into adjacent cells. |
+| `face_count_threshold` | `size_t` | `200` | Minimum face count threshold for arrangement cell filtering. Cells below this face count will be merged into adjacent cells. |
+
+### Advanced Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cyclic` | `bool` | `false` | Whether the trajectory is cyclic. ⚠️ This feature is experimental and not fully supported. |
+
+### Example Usage
+
+C++:
+```c++
+sweep::SweepOptions options;
+options.epsilon_env = 1e-3;
+options.epsilon_sil = 1e-3;
+options.with_insideness_check = false;
+options.max_split = 1000000;
+```
+
+Python:
+```python
+from sweep3d import SweepOptions
+
+options = SweepOptions()
+options.epsilon_env = 1e-3
+options.epsilon_sil = 1e-3
+options.with_insideness_check = False
+options.max_split = 1000000
+```
+
+YAML:
+```yaml
+parameters:
+    epsilon_env: 1e-3
+    epsilon_sil: 1e-3
+    with_insideness_check: false
+    max_split: 1000000
+```

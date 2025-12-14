@@ -10,7 +10,13 @@ Given any sweep represented as a smooth time-varying implicit function satisfyin
 
 ## Build
 
-Use the following command to build: 
+### Dependencies
+
+All third-party libraries are open-source and automatically fetched using cmake.
+
+### C++ Build
+
+Use the following command to build:
 
 ```bash
 mkdir build
@@ -18,87 +24,289 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
-The program `general_sweep` will be generated in the build file. 
+The C++ library `libsweep` and the command line tool `generalized_sweep` will be generated in the
+build directory. 
 
-### Dependency
+### Python Bindings
 
-Currently, all third-party libraries are now open-sourced.
+We also provide a Python binding for easy integration with Python workflows:
+
+```bash
+# Install the Python package
+pip install .
+```
 
 ## Usage
 
-To use the `general_sweep` tool, you must provide an initial grid file and output path as required arguments, along with any desired options. The trajectory functions are defined in `trajectory.h`. 
+### C++ API
 
-```bash
-./general_sweep <grid> <output> [OPTIONS]
+The C++ API consists of two simple functions, `generalized_sweep` and
+`generalized_sweep_from_config` defined in `include/sweep/generalized_sweep.h`.
+For complete API documentation, please see [generalized_sweep.h](include/sweep/generalized_sweep.h).
+
+#### `generalized_sweep`
+
+The `generalized_sweep` function provides the most general API. It takes the following inputs
+
+* a user-provided space-time function for pointwise function and gradient evaluation,
+* (optional) a simple initial grid specification ([doc](#grid-parameters)), and
+* (optional) customized sweep parameters ([doc](#sweep-options))
+
+and generates the following outputs
+
+* Sweep surface (final output)
+* Sweep envelope
+* Envelope arrangement
+
+In addition to the sweep surface, our code also provides the sweep envelope and envelope
+arrangement for advanced users. Please see our paper for their definition.
+
+Here is a simple example:
+
+```c++
+#include <sweep/generalized_sweep.h>
+#include <lagrange/io/save_mesh.h> // For IO only
+
+// Define implicit space-time function
+// Sweeping a ball of radius `r` along X axis by `d` unit.
+sweep::SpaceTimeFunc f = [](EigenRowVector4d p) {
+    constexpr double r = 0.2;
+    constexpr double d = 0.5;
+
+    double x = p[0];
+    double y = p[1];
+    double z = p[2];
+    double t = p[3];
+
+    double val = (x + d * t) * (x + d * t) + y * y + z * z - r * r;
+    Eigen::RowVector4d grad {
+        2 * (x + d * t),
+        2 * y,
+        2 * z,
+        2 * d * (x + d * t)
+    };
+    return {val, grad};
+};
+
+// Define an initial coarse grid
+sweep::GridSpec grid;
+grid.bbox_min = {-0.3, -0.3, -0.3};
+grid.bbox_max = {0.8, 0.8, 0.8};
+
+// Compute the sweep surface
+auto r = sweep::generalized_sweep(f, grid);
+lagrange::io::save_mesh("sweep_surface.obj", r.sweep_surface);
 ```
 
+#### `generalized_sweep_from_config`
 
-### 4D Implicit Function Framework: 
+The `generalized_sweep_from_config` function loads two configuration files:
+* `function_file` defines the space-time function
+* `config_file` defines the initial grid spec and sweep parameters
 
-The input of this program is any generalized sweep that is represented by a smooth 4D implicit function. Currently, we provide a series of pre-defined functions which include all paper examples. You can specify an implicit function file or use one of the predefined function names. Unfortunately, we do not provide a GUI or a user-friendly tool for defining such functions at this moment. If you want to specify your own sweep, please refer to this [repository](https://github.com/adobe-research/space-time-functions) and specific use cases in `trajectory.h` for details.
+It outputs the same set of meshes as `generalized_sweep`. Both `function_file` and `config_file`
+are in YAML format. 
 
-### Positional Arguments
 
-- `grid` : The path to the initial grid file that will be used for grid generation. This file can be either a `.msh` or `.json` file. When a `.json` file is provided, it will be converted to a `.msh` file internally. The format to specify an initial grid can be found [here](https://github.com/Jurwen/Swept-Volume/blob/main/data/test/grid_1.json). For this file format, you only need to specify the bounding box of the initial grid and how "dense" this initial grid is, which is controlled by the `resolution` parameter. The higher the resolution, the denser the initial mesh.
-- `output` : The output directory path where all generated files will be saved. The tool will create this directory if it doesn't exist. `.obj` files only contain the mesh, while `.msh` files have additional time info. Output files include:
-  - `envelope.msh`, `envelope.obj` : The mesh before arrangement (if `SAVE_CONTOUR` is enabled)
-  - (`0.obj`, `1.obj`, ...), (`0.msh`, `1.msh`, ...) : Separated cell components with 0 winding number.
-  - `mesh.obj`, `mesh.msh` : Combined cell componnets with 0 winding number.
-  - `features.json` : Feature lines (first slot) and points (second slot) 
+The function file is a YAML file that defines a space-time function supported by [space-time-functions](https://github.com/adobe-research/space-time-functions) library.
+Here is a simple function file that sweeps a ball along the X axis. Please see the [spec](https://github.com/adobe-research/space-time-functions/blob/main/doc/yaml_spec.md) for a complete set of supported transforms and shapes.
 
-### Options
+```yaml
+type: sweep
+dimension: 3
 
-- `-h, --help` : Show the help message and exit the program.
-- `-f, --function <file>` : Specify an implicit function file or predefined function name. Can be:
-  - A predefined function name (e.g., `fertility_v4`, `kitten_dog`, `letter_L_blend`, `ball_genus_roll`, `tangle_chair_S`, `star_S`, etc.)
-  - See `trajectory.h` for all available predefined functions
-- `--ee, --epsilon-env <value>` : Set the envelope threshold (default: 0.0005). Lower values produce finer grids for the sweep function. This is a DOUBLE value that controls the envelope's precision. This parameter corresponds to the `epsilon_env` variable stated in the paper
-- `--es, --epsilon-sil <value>` : Set the silhouette threshold (default: 0.005). Lower values produce finer grids for the silhouette function (sweep function taking partial derivative in time).This is a DOUBLE value that controls trajectory's' precision. This parameter corresponds to the `epsilon_sil` variable stated in the paper
-- `-i, --inside-check`: Whether the grid generation will do a full grid refinement considering regions of the envelope that is inside the sweep. Turning this on will generate a complete smooth envelope with fine details for inside regions. Note that this tag may add considerable amount of time and memory. 
+# The base shape
+primitive:
+  type: ball
+  center: [0.0, 0.0, 0.0]
+  radius: 0.04
+  degree: 2
 
-## Example:
-
-The following is an example of how to use the `general_sweep` tool with common options:
-
-```bash
-./general_sweep ../data/test/grid_1.json ../output/brush_stroke_example --ee 0.0005 --es 0.005 -f brush_stroke_blending
+# Sweeping trajectory
+transform:
+  type: polyline
+  points:
+  - [0, 0, 0]
+  - [0.5, 0.5, 0.5]
 ```
 
-### Parameter Breakdown:
+The `config_file` is used to specify the initial grid and the sweep options. Here is an example:
 
-This example command demonstrates how to generate a swept volume using the `brush_stroke_blending` function. Let's examine each parameter:
+```yaml
+grid:
+  resolution: [4, 4, 4]
+  bbox_min: [0, 0, 0]
+  bbox_max: [1, 1, 1]
 
-#### Required Positional Arguments:
-- **`../data/test/grid_1.json`** : The initial grid file that defines the starting tetrahedral mesh structure. This JSON file contains the initial spatial discretization that will be refined during the swept volume computation.
+parameters:
+  epsilon_env: 5e-4
+  epsilon_sil: 5e-4
+  with_snapping: false
+  with_insideness_check: true
+```
 
-- **`../output/brush_stroke_example`** : The output directory where all generated files will be saved. The tool will create this directory if it doesn't exist.
+The parameters section will be used to construct the `sweep::SweepOptions`.
 
-#### Optional Parameters:
-- **`--ee 0.0005`** : Sets the **envelope threshold** to 0.0005. This parameter controls how finely the algorithm subdivides the initial grid based on the implicit function's complexity. A small value (like 0.0005) means:
-  - High precision in capturing surface details
-  - More computational time and memory usage
-  - Better preservation of sharp features and fine geometric details
-  - The algorithm will subdivide grid cells more aggressively where the function changes rapidly
 
-- **`--es 0.005`** : Sets the **silhouette threshold** to 0.005. This parameter controls the precision of trajectory processing, which is crucial for:
-  - Temporal discretization of the 4D sweep
-  - Determining how finely to sample the 4D grid based on the complexity of the trajectory
-  - Capturing temporal variations in the implicit function
+Here is an example:
 
-- **`-f brush_stroke_blending`** : Specifies the **implicit function** to use. The `brush_stroke_blending` function represents a particular sweep pattern that:
-  - Creates a brush stroke-like swept volume with blending effects
-  - Demonstrates complex topological changes during the sweep
-  - Shows how multiple geometric elements can be blended together in the swept volume, as the base brush morphs between one sphere and two spheres.
-  - Is one of the predefined functions available in `trajectory.h`
+```c++
+#include <sweep/generalized_sweep.h>
+#include <lagrange/io/save_mesh.h> // For IO only
 
-### Expected Output:
-When this command runs successfully, you'll find in the `../output/brush_stroke_example/` directory:
-- **`0.obj`, `1.obj`, ...** : Individual mesh components representing different parts of the swept envelope with 0 winding number
-- **`0.msh`, `1.msh`, ...** : Containing per-vertex info of `time`
-- **`mesh.obj`** : Combined mesh components of the swept envelope with 0 winding number
-- **`mesh.msh`** : Containing per-vertex info of `time`
-- **`envelope.obj`** : The intermediate envelope mesh before pruning
-- **`envelope.msh`** : Containing per-vertex info of `time` and `is_regular`
-- **`features.json`** : Feature lines and points that capture the topological structure of the swept volume
+auto r = sweep::generalized_sweep_from_config(
+    "example/letter_L/sweep.yaml",
+    "example/letter_L/config.yaml"
+);
+lagrange::io::save_mesh("sweep_surface.obj", r.sweep_surface);
+```
 
-This example showcases how different parameters should work in an actual use case.
+### Python API
+
+```python
+import numpy as np
+from sweep3d import GridSpec, SweepOptions, generalized_sweep
+
+def my_space_time_function(point_4d):
+    """Space-time implicit function.
+    
+    :param point_4d: 4D point [x, y, z, t] where t ∈ [0, 1]
+    :type point_4d: numpy.ndarray
+    :return: Tuple of (value, gradient)
+    :rtype: tuple(float, numpy.ndarray)
+    """
+    x, y, z, t = point_4d
+    value = 0.5**2 - (x**2 + y**2 + z**2)
+    gradient = np.array([-2*x, -2*y, -2*z, 0.0])
+    return (value, gradient)
+
+# Configure and compute
+grid_spec = GridSpec()
+grid_spec.resolution = [8, 8, 8]
+result = generalized_sweep(my_space_time_function, grid_spec)
+print(f"Vertices: {result.sweep_surface.num_vertices()}")
+```
+
+See [`python/README.md`](python/README.md) for complete documentation.
+
+## Grid Parameters
+
+The `GridSpec` struct defines the initial spatial grid used for sweep computation. The grid represents the 3D spatial domain (the time dimension is handled separately).
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `resolution` | `[int, int, int]` | `[4, 4, 4]` | Number of grid cells in the x, y, z directions. Higher resolution provides better initial sampling but increases computation time. |
+| `bbox_min` | `[float, float, float]` | `[-0.2, -0.2, -0.2]` | Minimum corner of the axis-aligned bounding box that encloses the sweep volume. |
+| `bbox_max` | `[float, float, float]` | `[1.2, 1.2, 1.2]` | Maximum corner of the axis-aligned bounding box that encloses the sweep volume. |
+
+**Note:** The bounding box should be large enough to fully enclose the swept volume throughout the entire trajectory (t ∈ [0, 1]).
+
+## Sweep Options
+
+The `SweepOptions` struct provides fine-grained control over the sweep computation. All parameters are optional and have sensible defaults.
+
+### Refinement Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `epsilon_env` | `double` | `5e-4` | Tolerance for envelope grid refinement. Smaller values produce more accurate but denser results. |
+| `epsilon_sil` | `double` | `5e-3` | Tolerance for silhouette grid refinement. Controls the accuracy of feature detection. |
+| `max_split` | `int` | unlimited | Maximum number of splits allowed during grid refinement. Can be used to limit computation time. |
+| `with_adaptive_refinement` | `bool` | `true` | Adaptively refine the input grid based on the implicit function. |
+| `initial_time_samples` | `size_t` | `8` | Number of initial uniform time samples per spatial grid vertex. |
+
+### Quality Control Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_tet_radius_ratio` | `double` | `1e-5` | Minimum acceptable tetrahedron in-radius to circum-radius ratio during grid refinement. Tets below this threshold will not be refined further. |
+| `min_tet_edge_length` | `double` | `2e-5` | Minimum acceptable tetrahedron edge length during grid refinement. Tets with longest edge below this threshold will not be refined further. |
+
+### Surface Extraction Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `with_insideness_check` | `bool` | `true` | Whether to perform insideness checks during grid refinement. If true, the algorithm will stop refinement early once it detects a cell is inside the swept volume. |
+| `with_snapping` | `bool` | `true` | Whether to enable vertex snapping during isocontouring. Improves robustness of the mesh extraction. |
+| `volume_threshold` | `double` | `1e-5` | Minimum volume threshold for arrangement cell filtering. Cells below this volume will be merged into adjacent cells. |
+| `face_count_threshold` | `size_t` | `200` | Minimum face count threshold for arrangement cell filtering. Cells below this face count will be merged into adjacent cells. |
+
+### Advanced Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cyclic` | `bool` | `false` | Whether the trajectory is cyclic. ⚠️ This feature is experimental and not fully supported. |
+
+## Configuration Examples
+
+The following examples show how to configure both grid parameters and sweep options together:
+
+<details>
+<summary><b>C++ Example</b></summary>
+
+```c++
+#include <sweep/generalized_sweep.h>
+
+// Configure grid
+sweep::GridSpec grid;
+grid.resolution = {8, 8, 8};
+grid.bbox_min = {-0.5, -0.5, -0.5};
+grid.bbox_max = {1.5, 1.5, 1.5};
+
+// Configure sweep options
+sweep::SweepOptions options;
+options.epsilon_env = 1e-3;
+options.epsilon_sil = 1e-3;
+options.with_insideness_check = false;
+options.max_split = 1000000;
+
+// Compute sweep
+auto result = sweep::generalized_sweep(f, grid, options);
+```
+
+</details>
+
+<details>
+<summary><b>Python Example</b></summary>
+
+```python
+import sweep3d
+
+# Configure grid
+grid_spec = sweep3d.GridSpec()
+grid_spec.resolution = [8, 8, 8]
+grid_spec.bbox_min = [-0.5, -0.5, -0.5]
+grid_spec.bbox_max = [1.5, 1.5, 1.5]
+
+# Configure sweep options
+options = sweep3d.SweepOptions()
+options.epsilon_env = 1e-3
+options.epsilon_sil = 1e-3
+options.with_insideness_check = False
+options.max_split = 1000000
+
+# Compute sweep
+result = sweep3d.generalized_sweep(my_function, grid_spec, options)
+```
+
+</details>
+
+<details>
+<summary><b>YAML Example</b></summary>
+
+```yaml
+grid:
+    resolution: [8, 8, 8]
+    bbox_min: [-0.5, -0.5, -0.5]
+    bbox_max: [1.5, 1.5, 1.5]
+
+parameters:
+    epsilon_env: 1e-3
+    epsilon_sil: 1e-3
+    with_insideness_check: false
+    max_split: 1000000
+```
+
+</details>

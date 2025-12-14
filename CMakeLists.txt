@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
+option(SWEEP_PYTHON_BINDING "Build python binding" OFF)
+
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0.0")
     message(WARNING "CMake version is ${CMAKE_VERSION}, setting stuff for dependencies.")
     SET(CMAKE_POLICY_VERSION_MINIMUM ${REQUIRED_CMAKE_VERSION})
@@ -42,7 +44,6 @@ endif()
 include(cli11)
 include(Eigen3)
 include(nlohmann-json)
-include(nanothread)
 include(mtet)
 include(mtetcol)
 include(mshio)
@@ -52,43 +53,56 @@ include(libigl)
 include(spdlog)
 include(arrangement)
 include(stf)
+include(lagrange)
+include(yaml-cpp)
+include(nanothread)
 
 # project library
 target_compile_options(mtetcol PRIVATE -Wno-shorten-64-to-32 -Wno-logical-op-parentheses)
 set(TBB_STRICT           OFF CACHE BOOL   "" FORCE)
 set(TBB_WARNING_SUPPRESS "-Wno-shorten-64-to-32" CACHE STRING "" FORCE)
 file(GLOB SRC_FILES ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp ${CMAKE_CURRENT_LIST_DIR}/src/*.h)
-add_library(adaptive_column_grid STATIC ${SRC_FILES})
-target_include_directories(adaptive_column_grid PUBLIC
-     ${CMAKE_CURRENT_LIST_DIR}/src)
-target_link_libraries(adaptive_column_grid
+add_library(sweep STATIC ${SRC_FILES})
+target_include_directories(sweep PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/src)
+target_link_libraries(sweep
     PUBLIC 
-    Eigen3::Eigen
-    mtet::mtet 
-    mtetcol::mtetcol
-    mshio::mshio
-    nanothread::nanothread
-    nlohmann_json::nlohmann_json
-    smallvector::smallvector
-    unordered_dense::unordered_dense
-    igl::core
-    spdlog::spdlog
-    OpenMP::OpenMP_CXX
-    )
+        Eigen3::Eigen
+        lagrange::core
+    PRIVATE
+        OpenMP::OpenMP_CXX
+        arrangement::arrangement
+        mshio::mshio
+        mtet::mtet 
+        mtetcol::mtetcol
+        nlohmann_json::nlohmann_json
+        smallvector::smallvector
+        spdlog::spdlog
+        unordered_dense::unordered_dense
+        nanothread::nanothread
+        yaml-cpp::yaml-cpp
+        stf::stf
+)
+add_library(sweep::sweep ALIAS sweep)
 
 file(GLOB SWEEP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/app/include/*.h)
-add_executable(general_sweep "app/general_sweep.cpp")
+add_executable(generalized_sweep "app/generalized_sweep.cpp")
 
-target_compile_features(general_sweep PRIVATE cxx_std_17)
-target_compile_definitions(general_sweep PRIVATE -DDATA_DIR="${CMAKE_CURRENT_LIST_DIR}/data")
-target_include_directories(general_sweep PRIVATE ${CMAKE_CURRENT_LIST_DIR}/app/include)
-target_sources(general_sweep PRIVATE ${SWEEP_HEADERS})
-target_link_libraries(general_sweep PRIVATE
-    adaptive_column_grid
-    CLI11::CLI11
-    stf::stf
-    arrangement::arrangement
-    )
+target_compile_features(generalized_sweep PRIVATE cxx_std_17)
+target_compile_definitions(generalized_sweep PRIVATE -DDATA_DIR="${CMAKE_CURRENT_LIST_DIR}/data")
+target_include_directories(generalized_sweep PRIVATE ${CMAKE_CURRENT_LIST_DIR}/app/include)
+target_sources(generalized_sweep PRIVATE ${SWEEP_HEADERS})
+target_link_libraries(generalized_sweep
+    PRIVATE
+        sweep::sweep
+        CLI11::CLI11
+        stf::stf
+        lagrange::core
+        lagrange::io
+        nlohmann_json::nlohmann_json
+        yaml-cpp::yaml-cpp
+)
 
 option(GEN_SWEEP_TESTS "general sweep unit tests" OFF)
 if (GEN_SWEEP_TESTS)
@@ -100,7 +114,7 @@ if (GEN_SWEEP_TESTS)
  add_executable(sweep_volume_test ${TEST_FILES})
  target_link_libraries(sweep_volume_test
     PRIVATE 
-    adaptive_column_grid
+    sweep
     Catch2::Catch2
     mtet::mtet
     mtetcol::mtetcol
@@ -114,4 +128,25 @@ target_compile_definitions(
     -DTEST_FILE="${CMAKE_CURRENT_LIST_DIR}/data"
 )
  catch_discover_tests(sweep_volume_test)
+endif()
+
+if (SWEEP_PYTHON_BINDING)
+    if(SKBUILD)
+        if(APPLE)
+            set(CMAKE_INSTALL_RPATH @loader_path)
+        elseif(UNIX)
+            set(CMAKE_INSTALL_RPATH $ORIGIN)
+        endif()
+    endif()
+
+    include(nanobind)
+    set(PY_SRC_FILE ${CMAKE_CURRENT_LIST_DIR}/python/pysweep3d.cpp)
+    nanobind_add_module(pysweep3d NB_STATIC ${PY_SRC_FILE})
+    target_link_libraries(pysweep3d PRIVATE sweep::sweep nanothread::nanothread)
+    target_compile_features(pysweep3d PRIVATE cxx_std_20)
+    install(TARGETS pysweep3d nanothread LIBRARY
+        COMPONENT Sweep_Python_Runtime
+        DESTINATION ${SKBUILD_PLATLIB_DIR}/sweep3d
+    )
+    add_library(sweep::pysweep3d ALIAS pysweep3d)
 endif()

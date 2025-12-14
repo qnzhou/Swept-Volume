@@ -7,9 +7,8 @@
 
 #ifndef col_gridgen_h
 #define col_gridgen_h
-#include <nanothread/nanothread.h>
-#include <iostream>
 #include <mtetcol/simplicial_column.h>
+#include <iostream>
 #include "adaptive_column_grid.h"
 #include "ref_crit.h"
 #include "tet_quality.h"
@@ -25,15 +24,26 @@
 /// @param[in] max_splits           Max number of splits of the grid
 /// @param[in] insideness_check         Whether to enable the refinement for regions inside the sweep boundary
 /// @param[out] profileTimer            The time profiler. Details can be found in `timer.h`
-bool gridRefine(mtet::MTetMesh &grid,
-                vertExtrude &vertexMap,
-                insidenessMap &insideMap,
-                const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func,
-                const double threshold,
-                const double traj_threshold,
-                const int max_splits,
-                const int insideness_check,
-                std::array<double, timer_amount>& profileTimer,
-                std::array<size_t, timer_amount>& profileCount);
+/// @param[out] profileCount            The count profiler. Details can be found in `timer.h`
+/// @param[in] initial_time_samples         Initial number of time samples at each vertex. It will be rounded up to the next power of 2.
+/// @param[in] min_tet_radius_ratio      The minimum acceptable tetrahedron radius ratio during grid
+/// refinement. Tets with in-radius to circum-radius ratio below this threshold will not be refined
+/// further.
+/// @param[in] min_tet_edge_length       The minimum acceptable tetrahedron edge length during grid
+/// refinement. Tets with longest edge length below this threshold will not be refined further.
+bool gridRefine(
+    mtet::MTetMesh& grid,
+    vertExtrude& vertexMap,
+    insidenessMap& insideMap,
+    const std::function<std::pair<Scalar, Eigen::RowVector4d>(Eigen::RowVector4d)> func,
+    const double threshold,
+    const double traj_threshold,
+    const int max_splits,
+    const int insideness_check,
+    std::array<double, timer_amount>& profileTimer,
+    std::array<size_t, timer_amount>& profileCount,
+    size_t initial_time_samples,
+    const double min_tet_radius_ratio,
+    const double min_tet_edge_length);
 
 #endif /* col_gridgen_h */

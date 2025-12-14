@@ -1,9 +1,9 @@
 #pragma once
 
-#include <stf/primitives/implicit_function.h>
 #include <igl/AABB.h>
 #include <igl/fast_winding_number.h>
 #include <igl/read_triangle_mesh.h>
+#include <stf/primitives/implicit_function.h>
 
 #include <array>
 #include <iostream>
@@ -12,15 +12,18 @@
 class MeshSDF : public stf::ImplicitFunction<3>
 {
 public:
-    using Scalar  = stf::Scalar;
+    using Scalar = stf::Scalar;
 
-    MeshSDF(const std::string& filename, std::array<Scalar, 3> center, Scalar radius, Scalar offset=0)
+    MeshSDF(
+        const std::string& filename,
+        std::array<Scalar, 3> center,
+        Scalar radius,
+        Scalar offset = 0)
         : m_offset(offset)
     {
-        igl::read_triangle_mesh(filename,m_V,m_F);
+        igl::read_triangle_mesh(filename, m_V, m_F);
 
-        if (m_V.rows() == 0 || m_F.rows() == 0)
-        {
+        if (m_V.rows() == 0 || m_F.rows() == 0) {
             throw std::runtime_error("Failed to read mesh from file: " + filename);
         }
 
@@ -32,9 +35,9 @@ public:
         Scalar bbox_diag = (bbox_max - bbox_center).norm();
         m_V = ((m_V.rowwise() - bbox_center) * (radius / bbox_diag)).rowwise() + c;
 
-        m_tree.init(m_V,m_F);
+        m_tree.init(m_V, m_F);
         int order = 2;
-        igl::fast_winding_number(m_V, m_F, order, m_fwn_bvh);\
+        igl::fast_winding_number(m_V, m_F, order, m_fwn_bvh);
     }
 
     Scalar value(std::array<Scalar, 3> pos) const override
@@ -44,7 +47,7 @@ public:
         Eigen::RowVector3d c;
         auto sq_dist = m_tree.squared_distance(m_V, m_F, p, i, c);
         Scalar dist = std::sqrt(sq_dist);
-        auto w = igl::fast_winding_number(m_fwn_bvh,2.0,p);
+        auto w = igl::fast_winding_number(m_fwn_bvh, 2.0, p);
         return dist * (1 - 2 * w) + m_offset;
     }
 
@@ -54,7 +57,7 @@ public:
         int i;
         Eigen::RowVector3d c;
         auto sq_dist = m_tree.squared_distance(m_V, m_F, p, i, c);
-        auto w = igl::fast_winding_number(m_fwn_bvh,2.0,p);
+        auto w = igl::fast_winding_number(m_fwn_bvh, 2.0, p);
 
         Eigen::RowVector3d v = p - c;
         v.stableNormalize();

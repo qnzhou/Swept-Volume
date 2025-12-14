@@ -12,7 +12,7 @@ Given any sweep represented as a smooth time-varying implicit function satisfyin
 
 ### Dependencies
 
-All third-party libraries are open-source and automatically fetched using cmake.
+All third-party libraries are open-source and automatically fetched using CMake.
 
 ### C++ Build
 
@@ -25,7 +25,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 The C++ library `libsweep` and the command line tool `generalized_sweep` will be generated in the
-build directory. 
+build directory.
 
 ### Python Bindings
 
@@ -46,20 +46,20 @@ For complete API documentation, please see [generalized_sweep.h](include/sweep/g
 
 #### `generalized_sweep`
 
-The `generalized_sweep` function provides the most general API. It takes the following inputs
+The `generalized_sweep` function provides the most general API. It takes the following inputs:
 
 * a user-provided space-time function for pointwise function and gradient evaluation,
 * (optional) a simple initial grid specification ([doc](#grid-parameters)), and
 * (optional) customized sweep parameters ([doc](#sweep-options))
 
-and generates the following outputs
+and generates the following outputs:
 
 * Sweep surface (final output)
 * Sweep envelope
 * Envelope arrangement
 
 In addition to the sweep surface, our code also provides the sweep envelope and envelope
-arrangement for advanced users. Please see our paper for their definition.
+arrangement for advanced users. Please see our paper for their definitions.
 
 Here is a simple example:
 
@@ -68,7 +68,7 @@ Here is a simple example:
 #include <lagrange/io/save_mesh.h> // For IO only
 
 // Define implicit space-time function
-// Sweeping a ball of radius `r` along X axis by `d` unit.
+// Sweeping a ball of radius `r` along the X axis by a distance `d`.
 sweep::SpaceTimeFunc f = [](EigenRowVector4d p) {
     constexpr double r = 0.2;
     constexpr double d = 0.5;
@@ -105,10 +105,10 @@ The `generalized_sweep_from_config` function loads two configuration files:
 * `config_file` defines the initial grid spec and sweep parameters
 
 It outputs the same set of meshes as `generalized_sweep`. Both `function_file` and `config_file`
-are in YAML format. 
+are in YAML format.
 
 
-The function file is a YAML file that defines a space-time function supported by [space-time-functions](https://github.com/adobe-research/space-time-functions) library.
+The function file is a YAML file that defines a space-time function supported by the [space-time-functions](https://github.com/adobe-research/space-time-functions) library.
 Here is a simple function file that sweeps a ball along the X axis. Please see the [spec](https://github.com/adobe-research/space-time-functions/blob/main/doc/yaml_spec.md) for a complete set of supported transforms and shapes.
 
 ```yaml
@@ -146,7 +146,6 @@ parameters:
 ```
 
 The parameters section will be used to construct the `sweep::SweepOptions`.
-
 
 Here is an example:
 
@@ -211,10 +210,10 @@ The `SweepOptions` struct provides fine-grained control over the sweep computati
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `epsilon_env` | `double` | `5e-4` | Tolerance for envelope grid refinement. Smaller values produce more accurate but denser results. |
-| `epsilon_sil` | `double` | `5e-3` | Tolerance for silhouette grid refinement. Controls the accuracy of feature detection. |
-| `max_split` | `int` | unlimited | Maximum number of splits allowed during grid refinement. Can be used to limit computation time. |
-| `with_adaptive_refinement` | `bool` | `true` | Adaptively refine the input grid based on the implicit function. |
+| `epsilon_env` | `double` | `5e-4` | Tolerance for envelope approximation. |
+| `epsilon_sil` | `double` | `5e-3` | Tolerance for silhouette set approximation. |
+| `max_split` | `int` | unlimited | Maximum number of splits allowed during grid refinement. |
+| `with_adaptive_refinement` | `bool` | `true` | Enable/disable adaptive grid refinement. |
 | `initial_time_samples` | `size_t` | `8` | Number of initial uniform time samples per spatial grid vertex. |
 
 ### Quality Control Parameters
@@ -229,7 +228,7 @@ The `SweepOptions` struct provides fine-grained control over the sweep computati
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `with_insideness_check` | `bool` | `true` | Whether to perform insideness checks during grid refinement. If true, the algorithm will stop refinement early once it detects a cell is inside the swept volume. |
-| `with_snapping` | `bool` | `true` | Whether to enable vertex snapping during isocontouring. Improves robustness of the mesh extraction. |
+| `with_snapping` | `bool` | `true` | Whether to enable vertex snapping during isocontouring. Improves the quality of the extracted mesh. |
 | `volume_threshold` | `double` | `1e-5` | Minimum volume threshold for arrangement cell filtering. Cells below this volume will be merged into adjacent cells. |
 | `face_count_threshold` | `size_t` | `200` | Minimum face count threshold for arrangement cell filtering. Cells below this face count will be merged into adjacent cells. |
 

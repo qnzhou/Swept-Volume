@@ -119,15 +119,15 @@ dimension: 3
 primitive:
   type: ball
   center: [0.0, 0.0, 0.0]
-  radius: 0.04
+  radius: 0.2
   degree: 2
 
 # Sweeping trajectory
 transform:
   type: polyline
   points:
-  - [0, 0, 0]
-  - [0.5, 0.5, 0.5]
+  - [-0.5, 0, 0]
+  - [0.5, 0.0, 0.0]
 ```
 
 The `config_file` is used to specify the initial grid and the sweep options. Here is an example:
@@ -135,7 +135,7 @@ The `config_file` is used to specify the initial grid and the sweep options. Her
 ```yaml
 grid:
   resolution: [4, 4, 4]
-  bbox_min: [0, 0, 0]
+  bbox_min: [-1, -1, -1]
   bbox_max: [1, 1, 1]
 
 parameters:
@@ -154,8 +154,8 @@ Here is an example:
 #include <lagrange/io/save_mesh.h> // For IO only
 
 auto r = sweep::generalized_sweep_from_config(
-    "example/letter_L/sweep.yaml",
-    "example/letter_L/config.yaml"
+    "example/simple/sweep.yaml",
+    "example/simple/config.yaml"
 );
 lagrange::io::save_mesh("sweep_surface.obj", r.sweep_surface);
 ```

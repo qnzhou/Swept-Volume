@@ -126,7 +126,7 @@ primitive:
 transform:
   type: polyline
   points:
-  - [-0.5, 0, 0]
+  - [-0.5, 0.0, 0.0]
   - [0.5, 0.0, 0.0]
 ```
 
@@ -164,8 +164,10 @@ lagrange::io::save_mesh("sweep_surface.obj", r.sweep_surface);
 
 ```python
 import numpy as np
-from sweep3d import GridSpec, SweepOptions, generalized_sweep
+import sweep3d
+import lagrange # For IO only
 
+# Space-time function
 def my_space_time_function(point_4d):
     """Space-time implicit function.
     
@@ -175,18 +177,31 @@ def my_space_time_function(point_4d):
     :rtype: tuple(float, numpy.ndarray)
     """
     x, y, z, t = point_4d
-    value = 0.5**2 - (x**2 + y**2 + z**2)
-    gradient = np.array([-2*x, -2*y, -2*z, 0.0])
+    r = 0.2
+    d = 0.5
+    value = (x - t * d)**2 + y**2 + z**2 - r**2
+    gradient = np.array([2 * (x - t * d), 2 * y, 2 * z, -2 * d * (x - t * d)])
     return (value, gradient)
 
-# Configure and compute
-grid_spec = GridSpec()
-grid_spec.resolution = [8, 8, 8]
-result = generalized_sweep(my_space_time_function, grid_spec)
-print(f"Vertices: {result.sweep_surface.num_vertices()}")
+# Initial grid
+grid_spec = sweep3d.GridSpec()
+grid_spec.bbox_min = [-0.3, -0.3, -0.3]
+grid_spec.bbox_max = [0.8, 0.8, 0.8]
+
+# Compute sweep surface
+result = sweep3d.generalized_sweep(my_space_time_function, grid_spec)
+
+# Extract mesh data
+V = result.sweep_surface.vertices
+F = result.sweep_surface.facets
+print(f"#Vertices: {len(V)}, #Faces: {len(F)}")
+
+# Save mesh
+lagrange.io.save_mesh("out.msh", result.sweep_surface)
 ```
 
-See [`python/README.md`](python/README.md) for complete documentation.
+Please see `help(sweep3d)` for more details.
+
 
 ## Grid Parameters
 

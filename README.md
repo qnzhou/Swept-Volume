@@ -160,6 +160,8 @@ auto r = sweep::generalized_sweep_from_config(
 lagrange::io::save_mesh("sweep_surface.obj", r.sweep_surface);
 ```
 
+Please see more config-files-based examples in the [example](example) folder.
+
 ### Python API
 
 ```python

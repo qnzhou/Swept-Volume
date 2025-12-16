@@ -6,6 +6,7 @@ This directory contains various examples from the paper:
 * `brush_stroke`: Figure 5, 6
 * `fertility`: Figure 1
 * `letter_L_torus`: Figure 18
+* `flipping_torus`: Figure 2, 17
 
 The following additional examples are not in the paper.
 

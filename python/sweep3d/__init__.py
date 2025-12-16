@@ -10,8 +10,8 @@ from .pysweep3d import (
 
 __all__ = [
     "GridSpec",
-    "SweepOptions", 
+    "SweepOptions",
     "SweepResult",
     "generalized_sweep",
-    "generalized_sweep_from_config"
+    "generalized_sweep_from_config",
 ]

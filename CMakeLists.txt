@@ -22,7 +22,7 @@ find_package(OpenMP QUIET COMPONENTS CXX)
 # OpenMP
 if (OpenMP_CXX_FOUND)
   message(STATUS "OpenMP found: using OpenMP::OpenMP_CXX")
-  add_library(OpenMP::OpenMP_CXX ALIAS OpenMP::OpenMP_CXX)
+  #add_library(OpenMP::OpenMP_CXX ALIAS OpenMP::OpenMP_CXX)
 else()
   message(WARNING "OpenMP not found by CMake; wiring Homebrew libomp manually")
 

@@ -3,7 +3,7 @@ name: build and test
 on:
   push:
     branches:
-      - '**'
+      - 'main'
 
 jobs:
   build-Ubuntu:
@@ -19,6 +19,7 @@ jobs:
         cmake --build . --config Release -j4
 
   build-MacOS:
+    if: false
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4

@@ -63,6 +63,7 @@ target_link_libraries(sweep
         stf::stf
 )
 add_library(sweep::sweep ALIAS sweep)
+set_target_properties(sweep PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 file(GLOB SWEEP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/app/include/*.h)
 add_executable(generalized_sweep "app/generalized_sweep.cpp")
@@ -71,6 +72,7 @@ target_compile_features(generalized_sweep PRIVATE cxx_std_17)
 target_compile_definitions(generalized_sweep PRIVATE -DDATA_DIR="${CMAKE_CURRENT_LIST_DIR}/data")
 target_include_directories(generalized_sweep PRIVATE ${CMAKE_CURRENT_LIST_DIR}/app/include)
 target_sources(generalized_sweep PRIVATE ${SWEEP_HEADERS})
+set_target_properties(generalized_sweep PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(generalized_sweep
     PRIVATE
         sweep::sweep

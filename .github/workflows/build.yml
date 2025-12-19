@@ -19,7 +19,6 @@ jobs:
         cmake --build . --config Release -j4
 
   build-MacOS:
-    if: false
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
